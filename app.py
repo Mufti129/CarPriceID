@@ -150,27 +150,28 @@ st.markdown("""
         margin: 6px 0;
     }
 
-    /* Breakdown Matrix */
-    .breakdown-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.82rem;
+    /* Info Callouts */
+    .info-callout {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid #334155;
+        border-left: 4px solid #38bdf8;
+        border-radius: 8px;
+        padding: 14px 18px;
         margin-top: 10px;
+        margin-bottom: 14px;
     }
-    .breakdown-table th {
-        background: #0f172a;
-        color: #94a3b8;
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid #334155;
+    .info-callout-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #38bdf8;
         text-transform: uppercase;
-        font-size: 0.72rem;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.04em;
     }
-    .breakdown-table td {
-        padding: 8px 12px;
-        border-bottom: 1px solid #334155;
-        color: #e2e8f0;
+    .info-callout-desc {
+        font-size: 0.80rem;
+        color: #cbd5e1;
+        margin-top: 4px;
+        line-height: 1.5;
     }
 
     /* Sidebar Clean Styling */
@@ -256,7 +257,7 @@ def ensure_database_initialized():
         if brand_count < 5:
             seed_master_car_database()
             seed_car_auction_database(target_count=3000)
-            generate_massive_car_dataset(target_per_variant=35)
+            generate_massive_car_dataset(target_total_listings=15200)
             engine = PricingAnalyticsEngine(db)
             engine.refresh_daily_market_stats()
             engine.refresh_daily_wholesale_stats()
@@ -465,7 +466,7 @@ with st.sidebar:
     st.markdown("""
     <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
         <div style="color: #38bdf8; font-size: 0.76rem; font-weight: 700; text-transform: uppercase;">Catalog Scope</div>
-        <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 3px; line-height: 1.35;">10 Brands | 23 Models | 76 Variants | MPV, SUV, LCGC, EV (2014–2026)</div>
+        <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 3px; line-height: 1.35;">10 Brands | 23 Models | 76 Variants | 15,200+ Retail | 5,000 Lots (2014–2026)</div>
     </div>
     """, unsafe_allow_html=True)
     st.caption("Engine: Python 3.13 | ML: V7 Hedonic Residual | DB: SQLite ORM")
@@ -680,45 +681,6 @@ elif menu == "Fair Market Value (FMV) Calculator":
             </div>
             """, unsafe_allow_html=True)
 
-            # Hedonic Breakdown Card
-            st.markdown("#### Hedonic Factor Breakdown (Rincian Komponen Pembentuk Nilai)")
-            f_data = val_res["factors"]
-            
-            b1, b2, b3, b4 = st.columns(4)
-            with b1:
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Official MSRP OTR Baru</div>
-                    <div class="kpi-value" style="font-size: 1.25rem;">Rp {msrp:,.0f}</div>
-                    <div class="kpi-subtext">Tahun Rilis: {variant_obj.release_year_start}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with b2:
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Powertrain Multiplier</div>
-                    <div class="kpi-value" style="font-size: 1.25rem; color: #38bdf8;">x{f_data['fuel_retention_multiplier']:.3f}</div>
-                    <div class="kpi-subtext">{sel_fuel} Engine Retensi</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with b3:
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Odometer Impact</div>
-                    <div class="kpi-value" style="font-size: 1.25rem;">{val_res['odometer_difference_km']:+,.0f} KM</div>
-                    <div class="kpi-subtext">Deviasi dari benchmark 12.5k/thn</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with b4:
-                tax_p = f_data['tax_penalty_idr']
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Tax & Legality Penalty</div>
-                    <div class="kpi-value" style="font-size: 1.25rem; color: {'#f87171' if tax_p < 0 else '#34d399'};">Rp {tax_p:,.0f}</div>
-                    <div class="kpi-subtext">{sel_tax}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
             unit_info = {
                 "brand": sel_brand,
                 "model": sel_model,
@@ -733,54 +695,162 @@ elif menu == "Fair Market Value (FMV) Calculator":
                 "accident_free": sel_accident
             }
 
-            # Generate PDF Certificate
-            try:
-                pdf_bytes = generate_car_pdf_certificate(unit_info, val_res)
-                st.download_button(
-                    label="Unduh Sertifikat Valuasi Resmi (PDF)",
-                    data=pdf_bytes,
-                    file_name=f"CarPriceID_Valuation_{sel_brand}_{sel_model}_{sel_year}.pdf",
-                    mime="application/pdf"
+            # ==================================================================
+            # 3 DEDICATED SUB-TABS (HEDONIC/REGIONAL, RESIDUAL FORECAST, PDF CERT)
+            # ==================================================================
+            fmv_tab1, fmv_tab2, fmv_tab3 = st.tabs([
+                "1. Rincian Penyesuaian Hedonik & Regional",
+                "2. Proyeksi Depresiasi Masa Depan (Model Versi 7)",
+                "3. Unduh Sertifikat Valuasi Resmi (PDF)"
+            ])
+
+            # ---------------- TAB 1: HEDONIC & REGIONAL BREAKDOWN -------------
+            with fmv_tab1:
+                st.markdown("#### Hedonic Factor Breakdown (Rincian Komponen Pembentuk Nilai)")
+                f_data = val_res["factors"]
+                
+                b1, b2, b3, b4 = st.columns(4)
+                with b1:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Official MSRP OTR Baru</div>
+                        <div class="kpi-value" style="font-size: 1.25rem;">Rp {msrp:,.0f}</div>
+                        <div class="kpi-subtext">Tahun Rilis: {variant_obj.release_year_start}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with b2:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Powertrain Multiplier</div>
+                        <div class="kpi-value" style="font-size: 1.25rem; color: #38bdf8;">x{f_data['fuel_retention_multiplier']:.3f}</div>
+                        <div class="kpi-subtext">{sel_fuel} Engine Retensi</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with b3:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Odometer Impact</div>
+                        <div class="kpi-value" style="font-size: 1.25rem;">{val_res['odometer_difference_km']:+,.0f} KM</div>
+                        <div class="kpi-subtext">Deviasi dari benchmark 12.5k/thn</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with b4:
+                    tax_p = f_data['tax_penalty_idr']
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Tax & Legality Penalty</div>
+                        <div class="kpi-value" style="font-size: 1.25rem; color: {'#f87171' if tax_p < 0 else '#34d399'};">Rp {tax_p:,.0f}</div>
+                        <div class="kpi-subtext">{sel_tax}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f"""
+                <div class="info-callout">
+                    <div class="info-callout-title">Valuation Parameter Adjustment Breakdown</div>
+                    <div class="info-callout-desc">
+                        • <strong>Harga Dasar MSRP Baru:</strong> Rp {msrp:,.0f} (Penyusutan usia {val_res['age_years']} tahun: -{val_res['real_depreciation_pct']}%)<br>
+                        • <strong>Faktor Powertrain ({sel_fuel}):</strong> Multiplier {f_data['fuel_retention_multiplier']:.3f} (Daya retensi pasar Indonesia)<br>
+                        • <strong>Faktor Transmisi ({sel_trans}):</strong> Multiplier {f_data['transmission_multiplier']:.3f}<br>
+                        • <strong>Penyesuaian Odometer ({sel_km:,} KM vs target {val_res['expected_odometer_km']:,} KM):</strong> Deviasi {val_res['odometer_difference_km']:+,} KM<br>
+                        • <strong>Penyesuaian Wilayah ({sel_region}):</strong> Multiplier x{reg_res['multiplier']:.3f} (Delta: Rp {reg_res['regional_delta']:+,.0f}) — <em>{reg_res['description']}</em>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Regional Disparity Comparison Chart
+                st.markdown("#### Regional Price Disparity Matrix (Komparasi Lintas Wilayah Indonesia)")
+                reg_comparison = []
+                for r_name in get_all_regions():
+                    r_eval = apply_regional_pricing(val_res["predicted_fmv"], r_name)
+                    short_name = r_name.split(" (")[0]
+                    reg_comparison.append({
+                        "Wilayah": short_name,
+                        "Regional_FMV": r_eval["regional_fmv"],
+                        "Multiplier": f"x{r_eval['multiplier']:.3f}",
+                        "Delta_IDR": r_eval["regional_delta"],
+                        "Keterangan": r_eval["description"]
+                    })
+                df_reg = pd.DataFrame(reg_comparison)
+
+                fig_reg = px.bar(
+                    df_reg, x="Wilayah", y="Regional_FMV", text_auto=",.0f",
+                    color="Regional_FMV", color_continuous_scale="Blues"
                 )
-            except Exception as e:
-                st.caption(f"PDF Generator status: {e}")
+                fig_reg.update_traces(textposition='outside')
+                st.plotly_chart(format_dark_chart(fig_reg, is_price_axis=True, x_title="Wilayah Regional", y_title="FMV (IDR)"), use_container_width=True)
 
-            # Regional Disparity Comparison Chart
-            st.markdown("#### Regional Price Disparity Matrix (Komparasi Lintas Wilayah Indonesia)")
-            reg_comparison = []
-            for r_name in get_all_regions():
-                r_eval = apply_regional_pricing(val_res["predicted_fmv"], r_name)
-                short_name = r_name.split(" (")[0]
-                reg_comparison.append({
-                    "Wilayah": short_name,
-                    "Regional_FMV": r_eval["regional_fmv"],
-                    "Multiplier": f"x{r_eval['multiplier']:.3f}",
-                    "Delta_IDR": r_eval["regional_delta"]
-                })
-            df_reg = pd.DataFrame(reg_comparison)
+                st.dataframe(
+                    df_reg.style.format({
+                        "Regional_FMV": "Rp {:,.0f}",
+                        "Delta_IDR": "Rp {:+,.0f}"
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
 
-            fig_reg = px.bar(
-                df_reg, x="Wilayah", y="Regional_FMV", text_auto=",.0f",
-                color="Regional_FMV", color_continuous_scale="Blues"
-            )
-            fig_reg.update_traces(textposition='outside')
-            st.plotly_chart(format_dark_chart(fig_reg, is_price_axis=True, x_title="Wilayah Regional", y_title="FMV (IDR)"), use_container_width=True)
+            # ---------------- TAB 2: RESIDUAL VALUE FORECAST ------------------
+            with fmv_tab2:
+                st.markdown("#### Proyeksi Nilai Sisa Kendaraan (Residual Value Forecasting — Model Versi 7)")
+                st.caption(f"Prediksi harga pasar wajar untuk {sel_brand} {sel_model} ({sel_year}) untuk 1 hingga 10 tahun ke depan menggunakan algoritma Multi-Stage Residual Stacking.")
 
-            # 10-Year Residual Value Curve
-            st.markdown("#### 10-Year Residual Value Forecast (Kurva Proyeksi Nilai Sisa)")
-            curve_data = ml_car_model_v7.generate_residual_forecast_curve(msrp, sel_fuel, sel_trans)
-            df_curve = pd.DataFrame(curve_data)
+                curve_data = ml_car_model_v7.generate_residual_forecast_curve(msrp, sel_fuel, sel_trans)
+                df_curve = pd.DataFrame(curve_data)
 
-            fig_curve = go.Figure()
-            fig_curve.add_trace(go.Scatter(
-                x=df_curve["car_year"],
-                y=df_curve["projected_fmv"],
-                mode='lines+markers',
-                name='Nilai Pasar Proyeksi (IDR)',
-                line=dict(color='#38bdf8', width=2.5),
-                marker=dict(size=6)
-            ))
-            st.plotly_chart(format_dark_chart(fig_curve, show_legend=True, x_title="Tahun Kendaraan", y_title="Harga Pasar Wajar (IDR)", is_price_axis=True), use_container_width=True)
+                fig_curve = go.Figure()
+                fig_curve.add_trace(go.Scatter(
+                    x=df_curve["car_year"],
+                    y=df_curve["projected_fmv"],
+                    mode='lines+markers+text',
+                    text=[f"Rp {p/1e6:.1f}M" for p in df_curve["projected_fmv"]],
+                    textposition="top center",
+                    name='Nilai Pasar Proyeksi (IDR)',
+                    line=dict(color='#38bdf8', width=2.5),
+                    marker=dict(size=7, color='#0284c7')
+                ))
+                st.plotly_chart(format_dark_chart(fig_curve, show_legend=False, x_title="Tahun Kendaraan", y_title="Harga Pasar Wajar (IDR)", is_price_axis=True), use_container_width=True)
+
+                st.dataframe(
+                    df_curve.rename(columns={
+                        "year_age": "Usia (Tahun)",
+                        "car_year": "Tahun Produksi",
+                        "projected_fmv": "Estimasi FMV (IDR)",
+                        "retention_pct": "Tingkat Retensi Nilai (%)",
+                        "depreciation_pct": "Penyusutan Kumulatif (%)"
+                    }).style.format({
+                        "Estimasi FMV (IDR)": "Rp {:,.0f}",
+                        "Tingkat Retensi Nilai (%)": "{:.1f}%",
+                        "Penyusutan Kumulatif (%)": "{:.1f}%"
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+            # ---------------- TAB 3: OFFICIAL PDF CERTIFICATE -----------------
+            with fmv_tab3:
+                st.markdown("#### Official Automotive Valuation Certificate (PDF)")
+                st.caption("Unduh dokumen sertifikat resmi appraisal dengan nomor registrasi unik, verifikasi integritas, dan rincian parameter kondisi kendaraan untuk keperluan taksasi bank/leasing, jual-beli perorangan, atau showroom.")
+
+                col_dl1, col_dl2 = st.columns([1, 2])
+                with col_dl1:
+                    try:
+                        pdf_bytes = generate_car_pdf_certificate(unit_info, val_res)
+                        file_name = f"Sertifikat_Valuasi_{sel_brand}_{sel_model}_{sel_year}.pdf".replace(" ", "_").replace("/", "_")
+                        st.download_button(
+                            label="Unduh Sertifikat Valuasi Resmi (PDF)",
+                            data=pdf_bytes,
+                            file_name=file_name,
+                            mime="application/pdf",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Gagal generate PDF: {e}")
+                with col_dl2:
+                    st.markdown("""
+                    <div style="font-size: 0.80rem; color: #94a3b8; padding-top: 4px; line-height: 1.45;">
+                        Sertifikat digital terenkripsi dan siap dicetak (<em>Print Ready</em> format A4 resmi) memenuhi standar taksasi industri perbankan, multifinance, dan showroom mobil terpercaya di Indonesia.
+                    </div>
+                    """, unsafe_allow_html=True)
 
     finally:
         db.close()
@@ -927,7 +997,6 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
 
     df_auction = load_all_auction_lots_df()
     if not df_auction.empty:
-        # Auction KPIs
         sold_count = len(df_auction[df_auction["Status"] == "Sold"])
         clearance_rate = (sold_count / len(df_auction)) * 100.0 if len(df_auction) > 0 else 0.0
 
