@@ -790,36 +790,44 @@ elif menu == "Fair Market Value (FMV) Calculator":
 
             # ---------------- TAB 2: RESIDUAL VALUE FORECAST ------------------
             with fmv_tab2:
-                st.markdown("#### Proyeksi Nilai Sisa Kendaraan (Residual Value Forecasting — Model Versi 7)")
-                st.caption(f"Prediksi harga pasar wajar untuk {sel_brand} {sel_model} ({sel_year}) untuk 1 hingga 10 tahun ke depan menggunakan algoritma Multi-Stage Residual Stacking.")
+                st.markdown("#### Proyeksi Nilai Sisa Kendaraan (10-Year Forward Residual Value Forecast)")
+                st.caption(f"Kurva proyeksi depresiasi nilai pasar wajar (FMV) untuk {sel_brand} {sel_model} ({sel_year}) dari kondisi saat ini (2026) hingga 10 tahun ke depan (2036) menggunakan model Multi-Stage Residual Stacking.")
 
-                curve_data = ml_car_model_v7.generate_residual_forecast_curve(msrp, sel_fuel, sel_trans)
+                curve_data = ml_car_model_v7.generate_residual_forecast_curve(
+                    current_fmv=val_res["predicted_fmv"],
+                    fuel_type=sel_fuel,
+                    body_category=variant_obj.body_type,
+                    current_year=2026,
+                    car_production_year=sel_year
+                )
                 df_curve = pd.DataFrame(curve_data)
 
                 fig_curve = go.Figure()
                 fig_curve.add_trace(go.Scatter(
-                    x=df_curve["car_year"],
+                    x=df_curve["horizon_label"],
                     y=df_curve["projected_fmv"],
                     mode='lines+markers+text',
                     text=[f"Rp {p/1e6:.1f}M" for p in df_curve["projected_fmv"]],
-                    textposition="top center",
+                    textposition="top right",
                     name='Nilai Pasar Proyeksi (IDR)',
                     line=dict(color='#38bdf8', width=2.5),
-                    marker=dict(size=7, color='#0284c7')
+                    marker=dict(size=8, color='#0284c7')
                 ))
-                st.plotly_chart(format_dark_chart(fig_curve, show_legend=False, x_title="Tahun Kendaraan", y_title="Harga Pasar Wajar (IDR)", is_price_axis=True), use_container_width=True)
+                st.plotly_chart(format_dark_chart(fig_curve, show_legend=False, x_title="Horizon Waktu Depresiasi", y_title="Harga Pasar Wajar / FMV (IDR)", is_price_axis=True), use_container_width=True)
 
                 st.dataframe(
                     df_curve.rename(columns={
-                        "year_age": "Usia (Tahun)",
-                        "car_year": "Tahun Produksi",
+                        "horizon_label": "Horizon Waktu",
+                        "forecast_year": "Tahun Kalender",
                         "projected_fmv": "Estimasi FMV (IDR)",
-                        "retention_pct": "Tingkat Retensi Nilai (%)",
-                        "depreciation_pct": "Penyusutan Kumulatif (%)"
-                    }).style.format({
+                        "retention_pct": "Tingkat Retensi (%)",
+                        "cumulative_deprec_pct": "Penyusutan Kumulatif (%)",
+                        "annual_drop_pct": "Penyusutan Tahunan (%)"
+                    })[["Horizon Waktu", "Tahun Kalender", "Estimasi FMV (IDR)", "Tingkat Retensi (%)", "Penyusutan Kumulatif (%)", "Penyusutan Tahunan (%)"]].style.format({
                         "Estimasi FMV (IDR)": "Rp {:,.0f}",
-                        "Tingkat Retensi Nilai (%)": "{:.1f}%",
-                        "Penyusutan Kumulatif (%)": "{:.1f}%"
+                        "Tingkat Retensi (%)": "{:.1f}%",
+                        "Penyusutan Kumulatif (%)": "{:.1f}%",
+                        "Penyusutan Tahunan (%)": "{:.1f}%"
                     }),
                     use_container_width=True,
                     hide_index=True

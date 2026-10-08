@@ -93,6 +93,24 @@ class TestCarPipeline(unittest.TestCase):
         self.assertLess(eval_res["predicted_fmv"], 425000000)
         self.assertGreater(eval_res["real_depreciation_pct"], 0)
 
+    def test_residual_forecast_curve(self):
+        curve = ml_car_model_v7.generate_residual_forecast_curve(
+            current_fmv=300000000.0,
+            fuel_type="Bensin",
+            body_category="MPV",
+            current_year=2026,
+            car_production_year=2022
+        )
+        self.assertEqual(len(curve), 11) # Baseline + 10 Years
+        self.assertEqual(curve[0]["projected_fmv"], 300000000.0)
+        # Verify strictly decreasing price over time
+        for i in range(len(curve) - 1):
+            self.assertGreater(
+                curve[i]["projected_fmv"],
+                curve[i+1]["projected_fmv"],
+                f"Tahun {curve[i]['horizon_label']} ({curve[i]['projected_fmv']}) harus lebih besar dari {curve[i+1]['horizon_label']} ({curve[i+1]['projected_fmv']})"
+            )
+
     def test_regional_pricing(self):
         jabo_mult = get_region_multiplier("Jabodetabek (DKI Jakarta, Bogor, Depok, Tangerang, Bekasi)")
         self.assertEqual(jabo_mult, 1.000)
@@ -105,3 +123,4 @@ class TestCarPipeline(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

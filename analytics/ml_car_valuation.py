@@ -167,25 +167,73 @@ class MLCarValuationModelV7:
             }
         }
 
-    def generate_residual_forecast_curve(self, msrp_new: float, fuel_type: str = "Bensin", transmission: str = "Automatic") -> List[Dict[str, Any]]:
-        """Menghasilkan proyeksi nilai sisa mobil 10 tahun ke depan (Residual Value Curve)."""
+    def generate_residual_forecast_curve(
+        self,
+        current_fmv: float,
+        fuel_type: str = "Bensin",
+        body_category: str = "MPV",
+        current_year: int = 2026,
+        car_production_year: int = 2022
+    ) -> List[Dict[str, Any]]:
+        """
+        Menghasilkan proyeksi nilai sisa kendaraan (Residual Value Forecasting)
+        untuk horizon 1 hingga 10 tahun ke depan dari nilai FMV saat ini.
+        Nilai kendaraan mengalami depresiasi wajar (melandai ke bawah) seiring bertambahnya usia.
+        """
+        f_lower = fuel_type.lower()
+        c_lower = body_category.lower() if body_category else "mpv"
+        
+        # Base annual depreciation rate berdasarkan karakteristik powertrain
+        if "diesel" in f_lower:
+            base_rate = 0.058 # 5.8% / thn - Mesin diesel ladder-frame sangat kuat menahan depresiasi
+        elif "hybrid" in f_lower or "hev" in f_lower:
+            base_rate = 0.062 # 6.2% / thn - Efisiensi bahan bakar tinggi
+        elif "listrik" in f_lower or "ev" in f_lower or "bev" in f_lower:
+            base_rate = 0.088 # 8.8% / thn - Siklus teknologi baterai & inovasi EV cepat
+        else:
+            base_rate = 0.068 # 6.8% / thn - Bensin konvensional ICE
+
+        if "sedan" in c_lower or "mewah" in c_lower or "premium" in c_lower:
+            base_rate += 0.012
+        elif "mpv" in c_lower or "lcgc" in c_lower:
+            base_rate -= 0.006
+
         curve = []
-        for year_idx in range(1, 11):
-            eval_res = self.predict_valuation(
-                msrp_new=msrp_new,
-                claimed_year=2026 - year_idx,
-                odometer_km=year_idx * 12500,
-                engine_cc=1500,
-                fuel_type=fuel_type,
-                transmission=transmission,
-                current_year=2026
-            )
+        # Titik Awal: Tahun Ini (Baseline FMV)
+        curve.append({
+            "horizon_label": f"Saat Ini ({current_year})",
+            "year_index": 0,
+            "forecast_year": str(current_year),
+            "projected_fmv": float(round(current_fmv, -5)),
+            "retention_pct": 100.0,
+            "cumulative_deprec_pct": 0.0,
+            "annual_drop_pct": 0.0
+        })
+
+        accumulated_factor = 1.0
+        prev_price = current_fmv
+        for yr in range(1, 11):
+            future_calendar_year = current_year + yr
+            current_age = max(1, (current_year - car_production_year) + yr)
+            # Depresiasi tahunan melambat seiring mobil semakin tua (mendekati harga dasar/floor)
+            decay_smoothing = math.exp(-0.035 * current_age)
+            annual_rate = max(0.035, base_rate * decay_smoothing)
+            
+            accumulated_factor *= (1.0 - annual_rate)
+            future_fmv = max(current_fmv * 0.18, current_fmv * accumulated_factor)
+            cum_deprec = ((current_fmv - future_fmv) / current_fmv) * 100.0 if current_fmv > 0 else 0.0
+            retention = (future_fmv / current_fmv) * 100.0 if current_fmv > 0 else 0.0
+            annual_drop = ((prev_price - future_fmv) / prev_price) * 100.0 if prev_price > 0 else 0.0
+            prev_price = future_fmv
+
             curve.append({
-                "year_age": year_idx,
-                "car_year": 2026 - year_idx,
-                "projected_fmv": eval_res["predicted_fmv"],
-                "depreciation_pct": eval_res["real_depreciation_pct"],
-                "retention_pct": round(100.0 - eval_res["real_depreciation_pct"], 2)
+                "horizon_label": f"+{yr} Thn ({future_calendar_year})",
+                "year_index": yr,
+                "forecast_year": str(future_calendar_year),
+                "projected_fmv": float(round(future_fmv, -5)),
+                "retention_pct": round(retention, 1),
+                "cumulative_deprec_pct": round(cum_deprec, 1),
+                "annual_drop_pct": round(annual_drop, 1)
             })
         return curve
 
