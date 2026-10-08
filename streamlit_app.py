@@ -682,20 +682,25 @@ elif menu == "Fair Market Value (FMV) Calculator":
             reg_res = apply_regional_pricing(val_res["predicted_fmv"], sel_region)
             fmv_display = reg_res["regional_fmv"]
 
+            img_url = (getattr(variant_obj, "image_url", None) if variant_obj else None) or (getattr(model_obj, "image_url", None) if model_obj else None) or "https://imgcdn.oto.com/large/gallery/exterior/38/2607/toyota-kijang-innova-zenix-front-angle-low-view-528574.jpg"
+
             st.markdown(f"""
             <div class="val-hero-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-                    <div>
-                        <div style="color: #94a3b8; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">ESTIMATED FAIR MARKET VALUE (FMV)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+                    <div style="flex: 0 0 180px; max-width: 200px; text-align: center; background: rgba(15, 23, 42, 0.7); padding: 10px; border-radius: 10px; border: 1px solid #334155;">
+                        <img src="{img_url}" style="max-width: 100%; height: auto; max-height: 100px; object-fit: contain; border-radius: 6px;" alt="{sel_brand} {sel_model}">
+                        <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 5px; font-weight: 700;">{sel_brand} {sel_model}</div>
+                    </div>
+                    <div style="flex: 1; min-width: 260px;">
+                        <div style="color: #94a3b8; font-size: 0.80rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">ESTIMATED FAIR MARKET VALUE (FMV)</div>
                         <div class="val-price-hero">Rp {fmv_display:,.0f}</div>
-                        <div style="color: #cbd5e1; font-size: 0.84rem;">
+                        <div style="color: #cbd5e1; font-size: 0.84rem; margin-bottom: 4px;">
                             Bargain Buy Target (P25): <strong style="color: #34d399;">Rp {val_res['price_p25_deal']*reg_res['multiplier']:,.0f}</strong> &nbsp;|&nbsp; 
                             Showroom Pristine (P75): <strong style="color: #a78bfa;">Rp {val_res['price_p75_pristine']*reg_res['multiplier']:,.0f}</strong>
                         </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: #94a3b8; font-size: 0.78rem;">Depresiasi dari MSRP Baru (Rp {msrp:,.0f})</div>
-                        <div style="font-family: 'JetBrains Mono'; font-size: 1.55rem; font-weight: 800; color: #f59e0b;">-{val_res['real_depreciation_pct']}%</div>
+                        <div style="font-size: 0.80rem; color: #94a3b8;">
+                            Depresiasi dari MSRP Baru (Rp {msrp:,.0f}): <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 4px; font-weight: 700;">-{val_res['real_depreciation_pct']}%</span> &nbsp;|&nbsp; Wilayah: <strong>{sel_region.split(' (')[0]} (x{reg_res['multiplier']:.3f})</strong>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1017,80 +1022,6 @@ elif menu == "Market Price Monitoring & Quartiles":
                 },
                 hide_index=True
             )
-
-            # Deep-Dive Section: 3-Tier Price Corridors & Boxplot
-            st.markdown("---")
-            st.markdown("### Deep-Dive Unit Analysis & 3-Tier Price Corridor")
-            st.caption("Eksplorasi koridor harga lelang grosir (Tier 1 & Tier 2) vs harga jual retail showroom (Tier 3) beserta potensi margin keuntungan.")
-
-            variants_list = db.query(
-                MasterVariant,
-                MasterModel.name.label("model_name"),
-                MasterBrand.name.label("brand_name")
-            ).join(
-                MasterModel, MasterVariant.model_id == MasterModel.id
-            ).join(
-                MasterBrand, MasterModel.brand_id == MasterBrand.id
-            ).all()
-
-            var_labels = [f"{v.brand_name} {v.model_name} - {v.MasterVariant.variant_name}" for v in variants_list]
-            col_sel1, col_sel2 = st.columns([3, 1])
-            with col_sel1:
-                sel_label = st.selectbox("Pilih Varian Kendaraan", var_labels, index=0)
-            
-            sel_v_obj = variants_list[var_labels.index(sel_label)]
-            var_id = sel_v_obj.MasterVariant.id
-            
-            with col_sel2:
-                year_range = list(range(sel_v_obj.MasterVariant.release_year_start, (sel_v_obj.MasterVariant.release_year_end or 2026) + 1))
-                sel_year_mon = st.selectbox("Pilih Tahun Produksi", year_range, index=len(year_range)-1)
-
-            engine = PricingAnalyticsEngine(db)
-            corridor = engine.calculate_3tier_price_corridor(var_id, sel_year_mon)
-
-            t1, t2, t3 = st.columns(3)
-            with t1:
-                st.markdown(f"""
-                <div class="kpi-card" style="border-left: 3px solid #94a3b8;">
-                    <div class="kpi-label">Tier 1: Clearance Floor Limit</div>
-                    <div class="kpi-value" style="font-size: 1.35rem;">Rp {corridor['tier1_clearance_floor']:,.0f}</div>
-                    <div class="kpi-subtext">Harga pembukaan lelang balai grosir</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with t2:
-                st.markdown(f"""
-                <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-                    <div class="kpi-label">Tier 2: Wholesale Hammer Price</div>
-                    <div class="kpi-value" style="font-size: 1.35rem; color: #38bdf8;">Rp {corridor['tier2_wholesale_hammer']:,.0f}</div>
-                    <div class="kpi-subtext">Modal lelang + fee (Rp {corridor['total_cogs_modal']:,.0f})</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with t3:
-                st.markdown(f"""
-                <div class="kpi-card" style="border-left: 3px solid #34d399;">
-                    <div class="kpi-label">Tier 3: Retail Fair Market Value</div>
-                    <div class="kpi-value" style="font-size: 1.35rem; color: #34d399;">Rp {corridor['tier3_retail_fmv']:,.0f}</div>
-                    <div class="kpi-subtext">P25: Rp {corridor['tier3_retail_p25']:,.0f} | P75: Rp {corridor['tier3_retail_p75']:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            m1, m2 = st.columns(2)
-            with m1:
-                st.metric("Gross Profit Spread", f"Rp {corridor['dealer_gross_spread_idr']:,.0f}", f"{corridor['dealer_gross_margin_pct']:.1f}% Gross Margin")
-            with m2:
-                st.metric("Net Profit (Setelah Rekondisi Rp 4jt)", f"Rp {corridor['dealer_net_profit_idr']:,.0f}", f"{corridor['dealer_net_margin_pct']:.1f}% Net Margin")
-
-            # Boxplot listings aktual
-            df_retail = load_all_listings_df()
-            if not df_retail.empty:
-                sub_df = df_retail[(df_retail["Variant"] == sel_v_obj.MasterVariant.variant_name) & (df_retail["Price_Type"] == "Cash")]
-                if not sub_df.empty:
-                    st.markdown("#### Distribusi Sebaran Listing Pasar Aktual (Tukey IQR Boxplot)")
-                    fig_box = px.box(
-                        sub_df, x="Year", y="Price", color="Year",
-                        points="all", hover_data=["Title", "City", "Mileage_KM"]
-                    )
-                    st.plotly_chart(format_dark_chart(fig_box, is_price_axis=True, x_title="Tahun", y_title="Harga Cash (IDR)"), use_container_width=True)
 
     finally:
         db.close()
