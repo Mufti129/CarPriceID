@@ -682,13 +682,13 @@ elif menu == "Fair Market Value (FMV) Calculator":
             reg_res = apply_regional_pricing(val_res["predicted_fmv"], sel_region)
             fmv_display = reg_res["regional_fmv"]
 
-            img_url = (getattr(variant_obj, "image_url", None) if variant_obj else None) or (getattr(model_obj, "image_url", None) if model_obj else None) or "https://imgcdn.oto.com/large/gallery/exterior/38/2607/toyota-kijang-innova-zenix-front-angle-low-view-528574.jpg"
+            img_url = (getattr(variant_obj, "image_url", None) if variant_obj else None) or (getattr(model_obj, "image_url", None) if model_obj else None) or "https://cdn.imagin.studio/getimage?customer=demo&make=toyota&modelFamily=innova-zenix&angle=01"
 
             st.markdown(f"""
             <div class="val-hero-container">
                 <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
                     <div style="flex: 0 0 180px; max-width: 200px; text-align: center; background: rgba(15, 23, 42, 0.7); padding: 10px; border-radius: 10px; border: 1px solid #334155;">
-                        <img src="{img_url}" style="max-width: 100%; height: auto; max-height: 100px; object-fit: contain; border-radius: 6px;" alt="{sel_brand} {sel_model}">
+                        <img src="{img_url}" referrerpolicy="no-referrer" loading="lazy" style="max-width: 100%; height: auto; max-height: 100px; object-fit: contain; border-radius: 6px;" alt="{sel_brand} {sel_model}">
                         <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 5px; font-weight: 700;">{sel_brand} {sel_model}</div>
                     </div>
                     <div style="flex: 1; min-width: 260px;">
@@ -925,7 +925,10 @@ elif menu == "Market Price Monitoring & Quartiles":
                 median_p = float(s.price_median)
                 depreciation_pct = ((msrp - median_p) / msrp * 100.0) if (msrp and msrp > 0) else None
 
+                img_src = getattr(var, "image_url", None) or getattr(model, "image_url", None) or "https://cdn.imagin.studio/getimage?customer=demo&make=toyota&modelFamily=avanza&angle=01"
+
                 table_rows.append({
+                    "Foto Unit": img_src,
                     "Brand": brand.name,
                     "Model": model.name,
                     "Variant": var.variant_name,
@@ -950,7 +953,7 @@ elif menu == "Market Price Monitoring & Quartiles":
             with k1:
                 st.markdown(f"""
                 <div class="kpi-card">
-                    <div class="kpi-label">Matrix Matrix Entries</div>
+                    <div class="kpi-label">Matrix Entries</div>
                     <div class="kpi-value">{len(df_stats):,}</div>
                     <div class="kpi-subtext">Varian & tahun termonitor</div>
                 </div>
@@ -1011,6 +1014,7 @@ elif menu == "Market Price Monitoring & Quartiles":
                 filtered_df.sort_values(by=["Brand", "Model", "Year"], ascending=[True, True, False]),
                 use_container_width=True,
                 column_config={
+                    "Foto Unit": st.column_config.ImageColumn("Foto Unit", help="Foto studio resmi unit"),
                     "Min_Price": st.column_config.NumberColumn(label="Min Price", format="Rp %,.0f"),
                     "P25_Bargain": st.column_config.NumberColumn(label="P25 Bargain", format="Rp %,.0f"),
                     "Median_FMV": st.column_config.NumberColumn(label="Median FMV", format="Rp %,.0f"),
@@ -1164,11 +1168,14 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                 corridor = engine.calculate_3tier_price_corridor(var_obj.id, selected_year)
 
                 if corridor:
-                    auc_img = (getattr(var_obj, "image_url", None) if var_obj else None) or (getattr(model_obj, "image_url", None) if model_obj else None) or "https://raw.githubusercontent.com/Mufti129/CarPriceID/main/assets/car_placeholder.png"
+                    auc_img = (getattr(var_obj, "image_url", None) if var_obj else None) or (getattr(model_obj, "image_url", None) if model_obj else None) or f"https://cdn.imagin.studio/getimage?customer=demo&make={selected_brand_name.lower()}&angle=01"
                     
                     st.markdown(f"""
                     <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin: 16px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
-                        <div style="flex: 1;">
+                        <div style="flex: 0 0 160px; max-width: 180px; text-align: center; background: rgba(15, 23, 42, 0.7); padding: 8px; border-radius: 8px; border: 1px solid #334155;">
+                            <img src="{auc_img}" referrerpolicy="no-referrer" loading="lazy" style="max-width: 100%; height: auto; max-height: 80px; object-fit: contain; border-radius: 4px;" alt="{selected_brand_name} {selected_model_name}">
+                        </div>
+                        <div style="flex: 1; min-width: 240px;">
                             <div style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">3-TIER PRICE VALUATION PROFILE</div>
                             <div style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin: 2px 0;">{selected_brand_name} {selected_model_name} — {selected_var_name} ({selected_year})</div>
                             <div style="font-size: 0.80rem; color: #94a3b8;">Kategori: <strong>{model_obj.category if model_obj else 'Mobil'}</strong> | CC: <strong>{var_obj.engine_capacity_cc or (model_obj.engine_capacity_cc if model_obj else 1500)}cc</strong> | Bahan Bakar: <strong>{var_obj.fuel_type}</strong> | Transmisi: <strong>{var_obj.transmission_type}</strong></div>
@@ -1534,6 +1541,7 @@ elif menu == "Official Master Catalog (12 Years)":
     try:
         variants = db.query(
             MasterBrand.name.label("brand_name"),
+            MasterBrand.country_origin.label("country_origin"),
             MasterModel.name.label("model_name"),
             MasterModel.category.label("category"),
             MasterVariant.variant_name,
@@ -1542,7 +1550,9 @@ elif menu == "Official Master Catalog (12 Years)":
             MasterVariant.transmission_type,
             MasterVariant.fuel_type,
             MasterVariant.engine_capacity_cc,
-            MasterVariant.official_msrp_new
+            MasterVariant.official_msrp_new,
+            MasterVariant.image_url.label("var_img"),
+            MasterModel.image_url.label("model_img")
         ).join(
             MasterModel, MasterVariant.model_id == MasterModel.id
         ).join(
@@ -1550,21 +1560,69 @@ elif menu == "Official Master Catalog (12 Years)":
         ).all()
 
         df_cat = pd.DataFrame([{
+            "Foto Unit": v.var_img or v.model_img or f"https://cdn.imagin.studio/getimage?customer=demo&make={v.brand_name.lower()}&angle=01",
             "Brand": v.brand_name,
+            "Origin": v.country_origin or "-",
             "Model": v.model_name,
             "Category": v.category,
-            "Variant": v.variant_name,
-            "Years": f"{v.release_year_start} - {v.release_year_end or 'Now'}",
-            "Transmission": v.transmission_type,
+            "Variant Generation": v.variant_name,
+            "Release Start": v.release_year_start,
+            "Release End": v.release_year_end if v.release_year_end else "Present (2026)",
+            "Transmission": v.transmission_type or "Automatic",
             "Fuel": v.fuel_type,
-            "Engine_CC": f"{v.engine_capacity_cc} cc" if v.engine_capacity_cc else "EV",
-            "MSRP_New_IDR": float(v.official_msrp_new) if v.official_msrp_new else None
+            "Engine (CC)": v.engine_capacity_cc if v.engine_capacity_cc else 0,
+            "Official MSRP (New)": float(v.official_msrp_new) if v.official_msrp_new else None
         } for v in variants])
 
+        st.markdown(f"""
+        <div class="kpi-grid">
+            <div class="pro-metric-card">
+                <div class="pro-metric-label">Covered Brands</div>
+                <div class="pro-metric-val">{df_cat['Brand'].nunique()} Brands</div>
+                <div class="pro-metric-sub">Jepang, Korea, Cina, Eropa</div>
+            </div>
+            <div class="pro-metric-card emerald">
+                <div class="pro-metric-label">Total Models</div>
+                <div class="pro-metric-val">{df_cat['Model'].nunique()} Models</div>
+                <div class="pro-metric-sub">MPV, SUV, Hatchback, Sedan, EV</div>
+            </div>
+            <div class="pro-metric-card">
+                <div class="pro-metric-label">Master Variants</div>
+                <div class="pro-metric-val">{len(df_cat)} Variants</div>
+                <div class="pro-metric-sub">Rentang 12 tahun (2014-2026)</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_filter1, col_filter2 = st.columns([1, 2])
+        with col_filter1:
+            brand_filter = st.selectbox(
+                "Filter Merk Mobil",
+                options=["Semua Merk"] + sorted(df_cat["Brand"].unique().tolist())
+            )
+        with col_filter2:
+            search_catalog = st.text_input("Pencarian Katalog Cepat", placeholder="Cari merk, model, atau varian mobil...")
+
+        df_display = df_cat.copy()
+        if brand_filter != "Semua Merk":
+            df_display = df_display[df_display["Brand"] == brand_filter]
+        if search_catalog.strip():
+            sc_query = search_catalog.strip().lower()
+            df_display = df_display[
+                df_display["Brand"].str.lower().str.contains(sc_query) |
+                df_display["Model"].str.lower().str.contains(sc_query) |
+                df_display["Variant Generation"].str.lower().str.contains(sc_query) |
+                df_display["Category"].str.lower().str.contains(sc_query)
+            ]
+
         st.dataframe(
-            df_cat.style.format({
-                "MSRP_New_IDR": "Rp {:,.0f}"
-            }),
+            df_display.sort_values(by=["Brand", "Model", "Release Start"], ascending=[True, True, False]),
+            column_config={
+                "Foto Unit": st.column_config.ImageColumn("Foto Unit", help="Foto studio resmi unit model"),
+                "Official MSRP (New)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                "Engine (CC)": st.column_config.NumberColumn(format="%d cc")
+            },
+            hide_index=True,
             use_container_width=True
         )
     finally:
