@@ -1,4 +1,6 @@
 import math
+import pandas as pd
+import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -8,27 +10,11 @@ from models.catalog import (
     AuctionLot, WholesalePriceStats
 )
 
-try:
-    import numpy as np
-    def percentile(data, p):
-        return float(np.percentile(data, p))
-    def median(data):
-        return float(np.median(data))
-except ImportError:
-    def percentile(data, p):
-        if not data:
-            return 0.0
-        sorted_data = sorted(data)
-        k = (len(sorted_data) - 1) * (p / 100.0)
-        f = math.floor(k)
-        c = math.ceil(k)
-        if f == c:
-            return float(sorted_data[int(k)])
-        d0 = sorted_data[int(f)] * (c - k)
-        d1 = sorted_data[int(c)] * (k - f)
-        return float(d0 + d1)
-    def median(data):
-        return percentile(data, 50)
+def percentile(data, p):
+    return float(np.percentile(data, p))
+
+def median(data):
+    return float(np.median(data))
 
 class PricingAnalyticsEngine:
     """
@@ -64,7 +50,6 @@ class PricingAnalyticsEngine:
         if len(prices) < 2:
             return None
 
-        # 1. Outlier Removal menggunakan Interquartile Range (IQR)
         q25_raw = percentile(prices, 25)
         q75_raw = percentile(prices, 75)
         iqr = q75_raw - q25_raw
@@ -90,58 +75,64 @@ class PricingAnalyticsEngine:
         return stats
 
     def refresh_daily_market_stats(self):
-        """Menghitung dan memperbarui tabel market_price_stats harian untuk semua kombinasi aktif."""
-        combinations = self.db.query(
+        """Menghitung dan memperbarui tabel market_price_stats harian secara batch ultra-cepat."""
+        query = self.db.query(
             ScrapedListing.matched_variant_id,
             ScrapedListing.claimed_year,
-            ScrapedListing.city
+            ScrapedListing.city,
+            ScrapedListing.price
         ).filter(
             ScrapedListing.matched_variant_id.isnot(None),
             ScrapedListing.claimed_year.isnot(None),
-            ScrapedListing.is_dp_price == False
-        ).distinct().all()
+            ScrapedListing.is_dp_price == False,
+            ScrapedListing.price > 0
+        ).all()
+
+        if not query:
+            return 0
+
+        df = pd.DataFrame(query, columns=["variant_id", "year", "city", "price"])
+        df["price"] = df["price"].astype(float)
 
         today = datetime.utcnow().date()
-        updated_count = 0
+        self.db.query(MarketPriceStats).filter(MarketPriceStats.stat_date == today).delete()
 
-        for var_id, year, city in combinations:
-            stats = self.calculate_variant_pricing_stats(var_id, year, city)
-            if not stats:
+        new_stats = []
+        # Group by variant_id & year (Primary Granularity)
+        for (var_id, year), group in df.groupby(["variant_id", "year"]):
+            prices = group["price"].values
+            if len(prices) < 2:
                 continue
 
-            record = self.db.query(MarketPriceStats).filter(
-                MarketPriceStats.stat_date == today,
-                MarketPriceStats.variant_id == var_id,
-                MarketPriceStats.year == year,
-                MarketPriceStats.city == city
-            ).first()
+            q25 = float(np.percentile(prices, 25))
+            q75 = float(np.percentile(prices, 75))
+            iqr = q75 - q25
+            low_b = max(0, q25 - (1.5 * iqr))
+            up_b = q75 + (1.5 * iqr)
 
-            if not record:
-                record = MarketPriceStats(
-                    stat_date=today,
-                    variant_id=var_id,
-                    year=year,
-                    city=city,
-                    sample_count=stats["sample_count"],
-                    price_min=stats["price_min"],
-                    price_p25=stats["price_p25"],
-                    price_median=stats["price_median"],
-                    price_p75=stats["price_p75"],
-                    price_max=stats["price_max"]
-                )
-                self.db.add(record)
-            else:
-                record.sample_count = stats["sample_count"]
-                record.price_min = stats["price_min"]
-                record.price_p25 = stats["price_p25"]
-                record.price_median = stats["price_median"]
-                record.price_p75 = stats["price_p75"]
-                record.price_max = stats["price_max"]
+            f_prices = prices[(prices >= low_b) & (prices <= up_b)]
+            if len(f_prices) == 0:
+                f_prices = prices
 
-            updated_count += 1
+            stat = MarketPriceStats(
+                stat_date=today,
+                variant_id=int(var_id),
+                year=int(year),
+                city=None,
+                sample_count=len(f_prices),
+                price_min=float(np.min(f_prices)),
+                price_p25=float(np.percentile(f_prices, 25)),
+                price_median=float(np.median(f_prices)),
+                price_p75=float(np.percentile(f_prices, 75)),
+                price_max=float(np.max(f_prices))
+            )
+            new_stats.append(stat)
 
-        self.db.commit()
-        return updated_count
+        if new_stats:
+            self.db.bulk_save_objects(new_stats)
+            self.db.commit()
+
+        return len(new_stats)
 
     def calculate_wholesale_auction_stats(
         self,
@@ -183,57 +174,60 @@ class PricingAnalyticsEngine:
         }
 
     def refresh_daily_wholesale_stats(self):
-        """Menghitung dan memperbarui tabel wholesale_price_stats harian."""
-        combinations = self.db.query(
+        """Menghitung dan memperbarui tabel wholesale_price_stats harian secara batch ultra-cepat."""
+        query = self.db.query(
             AuctionLot.matched_variant_id,
             AuctionLot.claimed_year,
-            AuctionLot.pool_city
+            AuctionLot.base_limit_price,
+            AuctionLot.hammer_price,
+            AuctionLot.auction_status
         ).filter(
             AuctionLot.matched_variant_id.isnot(None),
             AuctionLot.claimed_year.isnot(None)
-        ).distinct().all()
+        ).all()
+
+        if not query:
+            return 0
+
+        df = pd.DataFrame(query, columns=["variant_id", "year", "base_price", "hammer_price", "status"])
+        df["base_price"] = df["base_price"].astype(float)
+        df["hammer_price"] = df["hammer_price"].astype(float)
 
         today = datetime.utcnow().date()
-        updated_count = 0
+        self.db.query(WholesalePriceStats).filter(WholesalePriceStats.stat_date == today).delete()
 
-        for var_id, year, pool_city in combinations:
-            stats = self.calculate_wholesale_auction_stats(var_id, year, pool_city)
-            if not stats or stats["total_lots"] == 0:
+        new_stats = []
+        for (var_id, year), group in df.groupby(["variant_id", "year"]):
+            total_lots = len(group)
+            sold_group = group[group["status"] == "Sold"]
+            sold_lots = len(sold_group)
+            clearance = (sold_lots / total_lots * 100.0) if total_lots > 0 else 0.0
+
+            base_vals = group["base_price"].dropna().values
+            hammer_vals = sold_group["hammer_price"].dropna().values
+
+            if len(base_vals) == 0:
                 continue
 
-            record = self.db.query(WholesalePriceStats).filter(
-                WholesalePriceStats.stat_date == today,
-                WholesalePriceStats.variant_id == var_id,
-                WholesalePriceStats.year == year,
-                WholesalePriceStats.pool_city == pool_city
-            ).first()
+            stat = WholesalePriceStats(
+                stat_date=today,
+                variant_id=int(var_id),
+                year=int(year),
+                pool_city=None,
+                sample_count=total_lots,
+                avg_base_price=float(np.mean(base_vals)),
+                median_hammer_price=float(np.median(hammer_vals)) if len(hammer_vals) > 0 else float(np.median(base_vals)),
+                min_base_price=float(np.min(base_vals)),
+                max_hammer_price=float(np.max(hammer_vals)) if len(hammer_vals) > 0 else float(np.max(base_vals)),
+                clearance_rate_pct=float(clearance)
+            )
+            new_stats.append(stat)
 
-            if not record:
-                record = WholesalePriceStats(
-                    stat_date=today,
-                    variant_id=var_id,
-                    year=year,
-                    pool_city=pool_city,
-                    sample_count=stats["total_lots"],
-                    avg_base_price=stats["avg_base_price"],
-                    median_hammer_price=stats["median_hammer_price"],
-                    min_base_price=stats["min_base_price"],
-                    max_hammer_price=stats["max_hammer_price"],
-                    clearance_rate_pct=stats["clearance_rate_pct"]
-                )
-                self.db.add(record)
-            else:
-                record.sample_count = stats["total_lots"]
-                record.avg_base_price = stats["avg_base_price"]
-                record.median_hammer_price = stats["median_hammer_price"]
-                record.min_base_price = stats["min_base_price"]
-                record.max_hammer_price = stats["max_hammer_price"]
-                record.clearance_rate_pct = stats["clearance_rate_pct"]
+        if new_stats:
+            self.db.bulk_save_objects(new_stats)
+            self.db.commit()
 
-            updated_count += 1
-
-        self.db.commit()
-        return updated_count
+        return len(new_stats)
 
     def calculate_3tier_price_corridor(
         self,
@@ -241,13 +235,6 @@ class PricingAnalyticsEngine:
         year: int,
         city: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Menghitung Koridor Harga 3-Tier untuk Mobil Bekas:
-        Tier 1: Clearance Floor (Harga Dasar Limit Lelang)
-        Tier 2: Wholesale Market (Harga Ketok Palu Lelang Terbentuk + Admin Fee)
-        Tier 3: Retail Fair Market Value (Harga Pasar Eceran Konsumen)
-        Serta menghitung Dealer Gross Spread & Net Profit Margin.
-        """
         retail_stats = self.calculate_variant_pricing_stats(variant_id, year, city)
         wholesale_stats = self.calculate_wholesale_auction_stats(variant_id, year, city)
 
@@ -299,9 +286,6 @@ class PricingAnalyticsEngine:
         min_discount_pct: float = 10.0,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """
-        Mendeteksi listing retail yang dijual jauh di bawah Fair Market Value (FMV).
-        """
         listings = self.db.query(
             ScrapedListing,
             MasterVariant.variant_name,
