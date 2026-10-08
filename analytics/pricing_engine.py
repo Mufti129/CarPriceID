@@ -165,6 +165,7 @@ class PricingAnalyticsEngine:
             "year": year,
             "pool_city": pool_city,
             "total_lots": total_count,
+            "sample_count": total_count,
             "sold_lots": sold_count,
             "clearance_rate_pct": clearance_rate,
             "avg_base_price": float(np.mean(base_prices)) if base_prices else 0.0,
@@ -243,13 +244,13 @@ class PricingAnalyticsEngine:
         age = max(0, 2026 - year)
 
         default_retail_fmv = msrp * max(0.35, 1.0 - (0.18 + (age * 0.065)))
-        retail_fmv = retail_stats["price_median"] if retail_stats else default_retail_fmv
-        retail_p25 = retail_stats["price_p25"] if retail_stats else (retail_fmv * 0.92)
-        retail_p75 = retail_stats["price_p75"] if retail_stats else (retail_fmv * 1.08)
+        retail_fmv = retail_stats.get("price_median", default_retail_fmv) if retail_stats else default_retail_fmv
+        retail_p25 = retail_stats.get("price_p25", retail_fmv * 0.92) if retail_stats else (retail_fmv * 0.92)
+        retail_p75 = retail_stats.get("price_p75", retail_fmv * 1.08) if retail_stats else (retail_fmv * 1.08)
 
-        if wholesale_stats and wholesale_stats["median_hammer_price"] > 0:
+        if wholesale_stats and wholesale_stats.get("median_hammer_price", 0) > 0:
             wholesale_hammer = wholesale_stats["median_hammer_price"]
-            clearance_floor = wholesale_stats["min_base_price"]
+            clearance_floor = wholesale_stats.get("min_base_price", wholesale_hammer * 0.90)
         else:
             wholesale_hammer = retail_fmv * 0.835
             clearance_floor = retail_fmv * 0.760
@@ -289,9 +290,9 @@ class PricingAnalyticsEngine:
             "est_net_profit": net_profit,
             "dealer_net_margin_pct": net_margin_pct,
             "net_margin_pct": round(net_margin_pct, 1),
-            "auction_lot_count": wholesale_stats["sample_count"] if wholesale_stats else 15,
-            "retail_sample_count": retail_stats["sample_count"] if retail_stats else 24,
-            "auction_clearance_rate": round(wholesale_stats["clearance_rate_pct"], 1) if (wholesale_stats and "clearance_rate_pct" in wholesale_stats) else 82.5
+            "auction_lot_count": wholesale_stats.get("total_lots", wholesale_stats.get("sample_count", 15)) if wholesale_stats else 15,
+            "retail_sample_count": retail_stats.get("sample_count", 24) if retail_stats else 24,
+            "auction_clearance_rate": round(wholesale_stats.get("clearance_rate_pct", 82.5), 1) if wholesale_stats else 82.5
         }
 
     def calculate_dual_tier_corridor(self, variant_id: int, year: int, city: Optional[str] = None) -> Dict[str, Any]:
@@ -342,17 +343,24 @@ class PricingAnalyticsEngine:
         results.sort(key=lambda x: x["gross_spread_pct"], reverse=True)
         return results[:limit]
 
-    def get_top_arbitrage_deals(
-        self,
-        min_discount_pct: float = 10.0,
-        limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def find_hot_deals(self, discount_threshold_pct: float = 12.0, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Mendeteksi listing mobil pasar marketplace (OLX/FB/Carmudi) yang dijual
+        di bawah harga wajar pasar (Hot Deal / Arbitrage).
+        """
+        # Pre-fetch MarketPriceStats to avoid N+1 queries
+        stats_map = {}
+        for s in self.db.query(MarketPriceStats).all():
+            stats_map[(s.variant_id, s.year)] = {
+                "price_median": float(s.price_median),
+                "price_p25": float(s.price_p25)
+            }
+
         listings = self.db.query(
             ScrapedListing,
             MasterVariant.variant_name,
             MasterModel.name.label("model_name"),
-            MasterBrand.name.label("brand_name"),
-            MasterVariant.official_msrp_new
+            MasterBrand.name.label("brand_name")
         ).join(
             MasterVariant, ScrapedListing.matched_variant_id == MasterVariant.id
         ).join(
@@ -367,38 +375,52 @@ class PricingAnalyticsEngine:
         ).all()
 
         deals = []
-        for l, var_name, model_name, brand_name, msrp_new in listings:
-            stats = self.calculate_variant_pricing_stats(l.matched_variant_id, l.claimed_year)
-            if not stats:
+        for l, var_name, model_name, brand_name in listings:
+            key = (l.matched_variant_id, l.claimed_year)
+            stat = stats_map.get(key)
+            if not stat:
                 continue
 
-            fmv = stats["price_median"]
-            if fmv <= 0 or float(l.price) >= fmv:
+            fmv = stat["price_median"]
+            price = float(l.price)
+            if fmv <= 0 or price >= fmv:
                 continue
 
-            discount_idr = fmv - float(l.price)
+            discount_idr = fmv - price
             discount_pct = (discount_idr / fmv) * 100.0
 
-            if discount_pct >= min_discount_pct:
+            if discount_pct >= discount_threshold_pct:
+                full_car_name = f"{brand_name} {model_name} {var_name}"
                 deals.append({
-                    "id": l.id,
+                    "listing_id": l.id,
                     "title": l.title,
+                    "url": l.url or f"https://www.olx.co.id/item/{l.external_id or l.id}",
+                    "vehicle_name": full_car_name,
+                    "motor_name": full_car_name,
                     "brand": brand_name,
                     "model": model_name,
                     "variant": var_name,
                     "year": l.claimed_year,
-                    "price": float(l.price),
+                    "price": price,
+                    "fair_market_value": fmv,
                     "fmv_price": fmv,
-                    "p25_target": stats["price_p25"],
+                    "p25_bargain": stat["price_p25"],
+                    "saving_amount": discount_idr,
                     "discount_idr": discount_idr,
-                    "discount_pct": discount_pct,
+                    "discount_pct": round(discount_pct, 1),
+                    "tax_status": l.tax_status or "Hidup / Panjang",
                     "city": l.city or "Jabodetabek",
                     "odometer_km": l.odometer_km,
-                    "transmission": l.transmission,
-                    "fuel_type": l.fuel_type,
-                    "source": l.source_platform,
-                    "url": l.url
+                    "transmission": l.transmission or "Automatic",
+                    "fuel_type": l.fuel_type or "Bensin",
+                    "source_platform": l.source_platform or "olx",
+                    "posted_at": l.posted_at or l.scraped_at
                 })
 
         deals.sort(key=lambda x: x["discount_pct"], reverse=True)
         return deals[:limit]
+
+    def get_top_arbitrage_deals(self, min_discount_pct: float = 10.0, limit: int = 50) -> List[Dict[str, Any]]:
+        """Alias untuk find_hot_deals."""
+        return self.find_hot_deals(discount_threshold_pct=min_discount_pct, limit=limit)
+

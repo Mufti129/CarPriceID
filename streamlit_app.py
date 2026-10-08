@@ -1101,40 +1101,66 @@ elif menu == "Market Price Monitoring & Quartiles":
 elif menu == "Bargain & Arbitrage Opportunities":
     st.markdown("""
     <div class="hero-appbar">
-        <div class="hero-title">Bargain Hunter & Arbitrage Scanner</div>
-        <div class="hero-subtitle">Mesin pemindai listing mobil retail yang dijual di bawah Fair Market Value (FMV). Peluang keuntungan perputaran unit untuk showroom & pembeli pintar.</div>
+        <div class="hero-title">Bargain Hunter & Arbitrage Engine</div>
+        <div class="hero-subtitle">Automated scanner detecting undervalued listings priced substantially below statistical market FMV with intact legal documents.</div>
+        <div class="hero-tags">
+            <span class="hero-tag-pill">Discount Arbitrage</span>
+            <span class="hero-tag-pill">Document Verification</span>
+            <span class="hero-tag-pill">Real-time Buy Signals</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     db = get_db_session()
     try:
         engine = PricingAnalyticsEngine(db)
+        st.markdown('<div class="content-panel"><div class="panel-header">Arbitrage Discovery Threshold</div>', unsafe_allow_html=True)
+        col_s1, col_s2 = st.columns([3, 1])
+        with col_s1:
+            threshold = st.slider("Minimum Discount Below Market Median (%)", min_value=5.0, max_value=35.0, value=12.0, step=1.0)
+        with col_s2:
+            deals = engine.find_hot_deals(discount_threshold_pct=threshold, limit=150)
+            st.metric("Identified Deals", f"{len(deals)} Units")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            min_disc = st.slider("Minimal Diskon Terhadap FMV (%)", min_value=5.0, max_value=30.0, value=10.0, step=1.0)
-        with col_f2:
-            max_results = st.selectbox("Jumlah Listing Ditampilkan", [25, 50, 100], index=1)
-
-        deals = engine.get_top_arbitrage_deals(min_discount_pct=min_disc, limit=max_results)
-
-        if deals:
-            st.success(f"Ditemukan {len(deals)} Peluang Hot Deal dengan potensi keuntungan margin tinggi.")
-            df_deals = pd.DataFrame(deals)
+        if not deals:
+            st.info(f"Tidak ditemukan listing dengan diskon >= {threshold}%. Coba turunkan ambang batas persentase diskon.")
+        else:
+            deals_df = pd.DataFrame(deals)
+            st.markdown("""
+            <div class="info-callout" style="border-left-color: #8b5cf6;">
+                <div class="info-callout-title" style="color: #a78bfa;">Peluang Margin Arbitrase Terdeteksi</div>
+                <div class="info-callout-desc">
+                    Daftar di bawah memfilter listing mobil hasil scraping marketplace (OLX/Carmudi/FB) yang dijual di bawah harga pasar wajar dengan surat-surat lengkap. Sangat ideal untuk dealer showroom mobil bekas atau pembeli yang mencari harga termurah.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             st.dataframe(
-                df_deals[[
-                    "title", "brand", "model", "year", "price", "fmv_price", "discount_pct", "discount_idr", "city", "url"
-                ]].style.format({
-                    "price": "Rp {:,.0f}",
-                    "fmv_price": "Rp {:,.0f}",
-                    "discount_idr": "Rp {:,.0f}",
-                    "discount_pct": "{:.1f}%"
+                deals_df[[
+                    "vehicle_name", "year", "price", "fair_market_value",
+                    "saving_amount", "discount_pct", "tax_status", "city", "url"
+                ]].rename(columns={
+                    "vehicle_name": "Vehicle Model",
+                    "year": "Year",
+                    "price": "Listing Price",
+                    "fair_market_value": "Market FMV",
+                    "saving_amount": "Estimated Savings",
+                    "discount_pct": "Discount %",
+                    "tax_status": "Tax Status",
+                    "city": "Location",
+                    "url": "Listing URL"
                 }),
+                column_config={
+                    "Listing Price": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Market FMV": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Estimated Savings": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Discount %": st.column_config.NumberColumn(format="%.1f%%"),
+                    "Listing URL": st.column_config.LinkColumn("View Listing Link")
+                },
+                hide_index=True,
                 use_container_width=True
             )
-        else:
-            st.info("Tidak ada listing yang memenuhi kriteria diskon saat ini.")
     finally:
         db.close()
 
