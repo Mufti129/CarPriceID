@@ -131,6 +131,121 @@ st.markdown("""
         color: #64748b;
     }
 
+    /* Pro Metric Cards & KPIs */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .pro-metric-card {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+        box-sizing: border-box;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .pro-metric-card:hover {
+        border-color: #60a5fa;
+        transform: translateY(-2px);
+    }
+    .pro-metric-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    }
+    .pro-metric-card.emerald::before {
+        background: linear-gradient(90deg, #10b981, #34d399);
+    }
+    .pro-metric-card.amber::before {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+    .pro-metric-card.rose::before {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+    }
+    .pro-metric-val {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #f8fafc;
+        line-height: 1.2;
+    }
+    .pro-metric-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+    }
+    .pro-metric-sub {
+        font-size: 0.74rem;
+        color: #cbd5e1;
+        margin-top: 4px;
+    }
+
+    /* Structured Information Callout Boxes */
+    .info-box-blue {
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        border-left: 4px solid #3b82f6;
+        padding: 16px 20px;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 18px;
+        color: #e2e8f0;
+    }
+    .info-box-green {
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-left: 4px solid #10b981;
+        padding: 16px 20px;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 18px;
+        color: #e2e8f0;
+    }
+    .info-box-amber {
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        border-left: 4px solid #f59e0b;
+        padding: 16px 20px;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 18px;
+        color: #e2e8f0;
+    }
+    .info-box-purple {
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        border-left: 4px solid #8b5cf6;
+        padding: 16px 20px;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 18px;
+        color: #e2e8f0;
+    }
+    .info-box-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+    }
+    .info-box-desc {
+        font-size: 0.84rem;
+        line-height: 1.5;
+        color: #cbd5e1;
+    }
+
     /* Valuation Box */
     .val-hero-container {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
