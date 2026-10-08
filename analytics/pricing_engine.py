@@ -182,6 +182,59 @@ class PricingAnalyticsEngine:
             "max_hammer_price": float(max(hammer_prices)) if hammer_prices else 0.0
         }
 
+    def refresh_daily_wholesale_stats(self):
+        """Menghitung dan memperbarui tabel wholesale_price_stats harian."""
+        combinations = self.db.query(
+            AuctionLot.matched_variant_id,
+            AuctionLot.claimed_year,
+            AuctionLot.pool_city
+        ).filter(
+            AuctionLot.matched_variant_id.isnot(None),
+            AuctionLot.claimed_year.isnot(None)
+        ).distinct().all()
+
+        today = datetime.utcnow().date()
+        updated_count = 0
+
+        for var_id, year, pool_city in combinations:
+            stats = self.calculate_wholesale_auction_stats(var_id, year, pool_city)
+            if not stats or stats["total_lots"] == 0:
+                continue
+
+            record = self.db.query(WholesalePriceStats).filter(
+                WholesalePriceStats.stat_date == today,
+                WholesalePriceStats.variant_id == var_id,
+                WholesalePriceStats.year == year,
+                WholesalePriceStats.pool_city == pool_city
+            ).first()
+
+            if not record:
+                record = WholesalePriceStats(
+                    stat_date=today,
+                    variant_id=var_id,
+                    year=year,
+                    pool_city=pool_city,
+                    sample_count=stats["total_lots"],
+                    avg_base_price=stats["avg_base_price"],
+                    median_hammer_price=stats["median_hammer_price"],
+                    min_base_price=stats["min_base_price"],
+                    max_hammer_price=stats["max_hammer_price"],
+                    clearance_rate_pct=stats["clearance_rate_pct"]
+                )
+                self.db.add(record)
+            else:
+                record.sample_count = stats["total_lots"]
+                record.avg_base_price = stats["avg_base_price"]
+                record.median_hammer_price = stats["median_hammer_price"]
+                record.min_base_price = stats["min_base_price"]
+                record.max_hammer_price = stats["max_hammer_price"]
+                record.clearance_rate_pct = stats["clearance_rate_pct"]
+
+            updated_count += 1
+
+        self.db.commit()
+        return updated_count
+
     def calculate_3tier_price_corridor(
         self,
         variant_id: int,
@@ -198,12 +251,10 @@ class PricingAnalyticsEngine:
         retail_stats = self.calculate_variant_pricing_stats(variant_id, year, city)
         wholesale_stats = self.calculate_wholesale_auction_stats(variant_id, year, city)
 
-        # Baseline fallback jika data salah satu layer tipis
         var = self.db.query(MasterVariant).filter(MasterVariant.id == variant_id).first()
         msrp = float(var.official_msrp_new) if (var and var.official_msrp_new) else 250_000_000.0
         age = max(0, 2026 - year)
 
-        # Teori depresiasi mobil: tahun 1 (~18%), berikutnya ~6.5%/thn
         default_retail_fmv = msrp * max(0.35, 1.0 - (0.18 + (age * 0.065)))
         retail_fmv = retail_stats["price_median"] if retail_stats else default_retail_fmv
         retail_p25 = retail_stats["price_p25"] if retail_stats else (retail_fmv * 0.92)
@@ -213,16 +264,14 @@ class PricingAnalyticsEngine:
             wholesale_hammer = wholesale_stats["median_hammer_price"]
             clearance_floor = wholesale_stats["min_base_price"]
         else:
-            # Standar rasio lelang mobil di Indonesia: Hammer Price ~ 82-85% Retail FMV, Floor ~ 74-78% Retail FMV
             wholesale_hammer = retail_fmv * 0.835
             clearance_floor = retail_fmv * 0.760
 
-        admin_fee = 2_500_000.0 # Biaya lelang mobil rata-rata
+        admin_fee = 2_500_000.0
         modal_unit = wholesale_hammer + admin_fee
         gross_spread = retail_fmv - modal_unit
         gross_margin_pct = (gross_spread / modal_unit * 100.0) if modal_unit > 0 else 0.0
 
-        # Estimasi biaya rekondisi salon mobil, detailing bodi, ganti oli & garansi showroom
         recondition_cost = 4_000_000.0
         net_profit = gross_spread - recondition_cost
         net_margin_pct = (net_profit / modal_unit * 100.0) if modal_unit > 0 else 0.0

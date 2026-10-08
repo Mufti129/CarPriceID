@@ -23,7 +23,7 @@ from pipeline.normalizer import ListingNormalizer
 from pipeline.scam_detector import ScamAndDPDetector
 from pipeline.entity_matcher import EntityMatcher
 from analytics.pricing_engine import PricingAnalyticsEngine
-from analytics.regional_index import REGIONAL_PRICE_INDEX, get_all_regions, apply_regional_pricing
+from analytics.regional_index import REGIONAL_PRICE_INDEX, get_all_regions, apply_regional_pricing, get_region_multiplier
 from analytics.ml_car_valuation import ml_car_model_v7
 from analytics.certificate_generator import generate_car_pdf_certificate
 from analytics.alert_dispatcher import alert_dispatcher
@@ -39,7 +39,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# PROFESSIONAL EXECUTIVE UI/UX STYLING (CLEAN SLATE THEME, NO EMOJIS, BALANCED LAYOUT)
+# EXECUTIVE UI/UX STYLING (HIGH CONTRAST, CLEAN SLATE, ZERO EMOJIS, PROPORTIONAL)
 # ==============================================================================
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -150,6 +150,29 @@ st.markdown("""
         margin: 6px 0;
     }
 
+    /* Breakdown Matrix */
+    .breakdown-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        margin-top: 10px;
+    }
+    .breakdown-table th {
+        background: #0f172a;
+        color: #94a3b8;
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid #334155;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+    }
+    .breakdown-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #334155;
+        color: #e2e8f0;
+    }
+
     /* Sidebar Clean Styling */
     section[data-testid="stSidebar"] {
         background-color: #0f172a;
@@ -236,6 +259,7 @@ def ensure_database_initialized():
             generate_massive_car_dataset(target_per_variant=35)
             engine = PricingAnalyticsEngine(db)
             engine.refresh_daily_market_stats()
+            engine.refresh_daily_wholesale_stats()
     finally:
         db.close()
 
@@ -656,6 +680,45 @@ elif menu == "Fair Market Value (FMV) Calculator":
             </div>
             """, unsafe_allow_html=True)
 
+            # Hedonic Breakdown Card
+            st.markdown("#### Hedonic Factor Breakdown (Rincian Komponen Pembentuk Nilai)")
+            f_data = val_res["factors"]
+            
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Official MSRP OTR Baru</div>
+                    <div class="kpi-value" style="font-size: 1.25rem;">Rp {msrp:,.0f}</div>
+                    <div class="kpi-subtext">Tahun Rilis: {variant_obj.release_year_start}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with b2:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Powertrain Multiplier</div>
+                    <div class="kpi-value" style="font-size: 1.25rem; color: #38bdf8;">x{f_data['fuel_retention_multiplier']:.3f}</div>
+                    <div class="kpi-subtext">{sel_fuel} Engine Retensi</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with b3:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Odometer Impact</div>
+                    <div class="kpi-value" style="font-size: 1.25rem;">{val_res['odometer_difference_km']:+,.0f} KM</div>
+                    <div class="kpi-subtext">Deviasi dari benchmark 12.5k/thn</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with b4:
+                tax_p = f_data['tax_penalty_idr']
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Tax & Legality Penalty</div>
+                    <div class="kpi-value" style="font-size: 1.25rem; color: {'#f87171' if tax_p < 0 else '#34d399'};">Rp {tax_p:,.0f}</div>
+                    <div class="kpi-subtext">{sel_tax}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
             unit_info = {
                 "brand": sel_brand,
                 "model": sel_model,
@@ -681,6 +744,27 @@ elif menu == "Fair Market Value (FMV) Calculator":
                 )
             except Exception as e:
                 st.caption(f"PDF Generator status: {e}")
+
+            # Regional Disparity Comparison Chart
+            st.markdown("#### Regional Price Disparity Matrix (Komparasi Lintas Wilayah Indonesia)")
+            reg_comparison = []
+            for r_name in get_all_regions():
+                r_eval = apply_regional_pricing(val_res["predicted_fmv"], r_name)
+                short_name = r_name.split(" (")[0]
+                reg_comparison.append({
+                    "Wilayah": short_name,
+                    "Regional_FMV": r_eval["regional_fmv"],
+                    "Multiplier": f"x{r_eval['multiplier']:.3f}",
+                    "Delta_IDR": r_eval["regional_delta"]
+                })
+            df_reg = pd.DataFrame(reg_comparison)
+
+            fig_reg = px.bar(
+                df_reg, x="Wilayah", y="Regional_FMV", text_auto=",.0f",
+                color="Regional_FMV", color_continuous_scale="Blues"
+            )
+            fig_reg.update_traces(textposition='outside')
+            st.plotly_chart(format_dark_chart(fig_reg, is_price_axis=True, x_title="Wilayah Regional", y_title="FMV (IDR)"), use_container_width=True)
 
             # 10-Year Residual Value Curve
             st.markdown("#### 10-Year Residual Value Forecast (Kurva Proyeksi Nilai Sisa)")
@@ -732,7 +816,6 @@ elif menu == "Market Price Monitoring & Quartiles":
 
         engine = PricingAnalyticsEngine(db)
 
-        # 3-Tier Corridor Analysis
         col_y, col_info = st.columns([1, 3])
         with col_y:
             sel_year_mon = st.selectbox("Pilih Tahun Produksi", list(range(sel_v_obj.MasterVariant.release_year_start, (sel_v_obj.MasterVariant.release_year_end or 2026) + 1)), index=0)
@@ -844,6 +927,38 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
 
     df_auction = load_all_auction_lots_df()
     if not df_auction.empty:
+        # Auction KPIs
+        sold_count = len(df_auction[df_auction["Status"] == "Sold"])
+        clearance_rate = (sold_count / len(df_auction)) * 100.0 if len(df_auction) > 0 else 0.0
+
+        ak1, ak2, ak3 = st.columns(3)
+        with ak1:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Auction Clearance Rate</div>
+                <div class="kpi-value" style="color: #34d399;">{clearance_rate:.1f}%</div>
+                <div class="kpi-subtext">{sold_count:,} sold dari {len(df_auction):,} lots</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with ak2:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Median Base Price</div>
+                <div class="kpi-value">Rp {df_auction['Base_Limit_Price'].median()/1e6:.1f}M</div>
+                <div class="kpi-subtext">Floor limit lelang nasional</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with ak3:
+            sold_df = df_auction[df_auction["Hammer_Price"].notnull()]
+            med_hammer = sold_df["Hammer_Price"].median() if not sold_df.empty else 0
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Median Hammer Price</div>
+                <div class="kpi-value" style="color: #38bdf8;">Rp {med_hammer/1e6:.1f}M</div>
+                <div class="kpi-subtext">Harga terbentuk ketok palu</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         col_af1, col_af2, col_af3 = st.columns(3)
         with col_af1:
             pools = ["Semua Pool"] + sorted(df_auction["Pool_City"].unique().tolist())
