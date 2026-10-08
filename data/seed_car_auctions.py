@@ -5,6 +5,7 @@ harga dasar limit, harga terbentuk ketok palu, serta catatan kondisi fisik.
 """
 
 import random
+import urllib.parse
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from models.database import SessionLocal, init_db
@@ -93,6 +94,14 @@ def seed_car_auction_database(target_count: int = 5000):
             plat_letters = random.choice(["B", "D", "L", "N", "W", "H", "AD", "AB", "BK", "BG", "DK", "KT"])
             nopol = f"{plat_letters} {random.randint(1000, 9999)} {random.choice(['XX', 'YY', 'ZZ', 'AB', 'CD', 'EF'])}"
 
+            brand_n = var.model.brand.name if (var.model and var.model.brand) else "Toyota"
+            model_n = var.model.name if var.model else "Avanza"
+            q_enc = urllib.parse.quote_plus(f"{brand_n} {model_n}")
+            if "jba" in platform.lower():
+                lot_url = f"https://www.jba.co.id/id/lelang-mobil?keyword={q_enc}"
+            else:
+                lot_url = f"https://www.ibid.astra.co.id/cari-otomotif?keyword={q_enc}&kategori=mobil"
+
             lot = AuctionLot(
                 source_platform=platform,
                 lot_number=lot_no,
@@ -124,7 +133,7 @@ def seed_car_auction_database(target_count: int = 5000):
                 admin_fee=2500000.0,
                 auction_status=status,
                 bid_count=bids,
-                url=f"https://lelang.co.id/lot/{lot_no}"
+                url=lot_url
             )
             lots_to_add.append(lot)
 

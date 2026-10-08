@@ -6,7 +6,9 @@ serta variasi kondisi fisik riil.
 """
 
 import os
+import re
 import random
+import urllib.parse
 import pandas as pd
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -182,8 +184,21 @@ def generate_massive_car_dataset(target_total_listings: int = 15200):
                 tax_status = "Pajak Hidup / Panjang" if is_tax_active else "Pajak Mati 1 Tahun"
                 posted_time = base_time - timedelta(days=random.randint(0, 35), hours=random.randint(1, 23), minutes=random.randint(1, 59))
 
-                external_id = f"CAR-{platform[:3].upper()}-{ext_counter}"
-                item_url = f"https://www.{platform}.co.id/mobil-bekas/iklan-{ext_counter}"
+                clean_b = re.sub(r'[^a-zA-Z0-9]+', '-', brand_name.lower()).strip('-')
+                clean_m = re.sub(r'[^a-zA-Z0-9]+', '-', model_name.lower()).strip('-')
+                q_enc = urllib.parse.quote_plus(f"{brand_name} {model_name} {year}")
+                if "olx" in platform.lower():
+                    item_url = f"https://www.olx.co.id/mobil-bekas_c198/q-{clean_b}-{clean_m}-{year}"
+                elif "carsome" in platform.lower():
+                    item_url = f"https://www.carsome.id/beli-mobil-bekas?q={q_enc}"
+                elif "carmudi" in platform.lower():
+                    item_url = f"https://www.carmudi.co.id/mobil-dijual/{clean_b}/{clean_m}"
+                elif "mobil123" in platform.lower():
+                    item_url = f"https://www.mobil123.com/mobil-dijual/{clean_b}/{clean_m}/indonesia"
+                elif "facebook" in platform.lower():
+                    item_url = f"https://www.facebook.com/marketplace/search/?query={q_enc}"
+                else:
+                    item_url = f"https://www.olx.co.id/mobil-bekas_c198/q-{clean_b}-{clean_m}"
 
                 listing = ScrapedListing(
                     source_platform=platform,

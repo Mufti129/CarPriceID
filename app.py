@@ -1206,7 +1206,7 @@ elif menu == "Bargain & Arbitrage Opportunities":
                     "Market FMV": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Estimated Savings": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Discount %": st.column_config.NumberColumn(format="%.1f%%"),
-                    "Listing URL": st.column_config.LinkColumn("View Listing Link")
+                    "Listing URL": st.column_config.LinkColumn("Listing URL", display_text="Buka Iklan ↗")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1577,12 +1577,13 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                 filtered_lots[[
                     "Platform", "Lot_No", "Brand", "Model", "Variant", "Year", "Pool_City",
                     "Mileage_KM", "Grade_Exterior", "Grade_Interior", "Grade_Engine", "Grade_Frame",
-                    "Base_Limit_Price", "Hammer_Price", "Status"
+                    "Base_Limit_Price", "Hammer_Price", "Status", "URL"
                 ]],
                 column_config={
                     "Base_Limit_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Hammer_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
-                    "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM")
+                    "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
+                    "URL": st.column_config.LinkColumn("Auction Link", display_text="Buka Lot Lelang ↗")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1601,7 +1602,17 @@ elif menu == "Raw Scraped Dataset Explorer":
 
     df_retail = load_all_listings_df()
     if not df_retail.empty:
-        st.dataframe(df_retail, use_container_width=True)
+        st.dataframe(
+            df_retail,
+            column_config={
+                "Price": st.column_config.NumberColumn(format="Rp %,.0f"),
+                "MSRP_New": st.column_config.NumberColumn(format="Rp %,.0f"),
+                "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
+                "URL": st.column_config.LinkColumn("Listing URL", display_text="Buka Iklan ↗")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
         csv = df_retail.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="Unduh Dataset Lengkap (CSV)",
