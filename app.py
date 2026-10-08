@@ -1206,7 +1206,7 @@ elif menu == "Bargain & Arbitrage Opportunities":
                     "Market FMV": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Estimated Savings": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Discount %": st.column_config.NumberColumn(format="%.1f%%"),
-                    "Listing URL": st.column_config.LinkColumn("Listing URL")
+                    "Listing URL": st.column_config.LinkColumn("Listing URL", display_text="Link Post")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1583,7 +1583,7 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                     "Base_Limit_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Hammer_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
-                    "URL": st.column_config.LinkColumn("Auction URL")
+                    "URL": st.column_config.LinkColumn("Auction URL", display_text="Link Post")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1650,7 +1650,7 @@ elif menu == "Raw Scraped Dataset Explorer":
             column_config={
                 "Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                 "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
-                "URL": st.column_config.LinkColumn("Listing URL")
+                "URL": st.column_config.LinkColumn("Listing URL", display_text="Link Post")
             },
             hide_index=True,
             use_container_width=True
