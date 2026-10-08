@@ -1,10 +1,10 @@
-# 🚗 CarPrice ID — Used Car Intelligence & Valuation Platform
+# CarPrice ID — Used Car Intelligence & Valuation Platform
 
 **CarPrice ID** adalah platform kecerdasan pasar dan valuasi harga wajar mobil bekas Indonesia (*End-to-End Used Car Intelligence & Hedonic Valuation Engine*) yang dirancang khusus untuk ekosistem pasar kendaraan roda empat di Indonesia.
 
 ---
 
-## 🌟 Fitur Utama Sistem
+## Fitur Utama Sistem
 
 1. **Market Overview & Macro Analytics:** Distribusi volume pasar per brand, bahan bakar (Bensin, Diesel, Hybrid, EV), transmisi, histogram harga, dan sebaran regional.
 2. **Fair Market Value (FMV) Calculator:** Mesin valuasi berbasis Machine Learning Hedonic Regression Versi 7 ($R^2 = 0.9542$, $\text{MAPE} = 3.94\%$) dilengkapi kurva proyeksi nilai sisa 10 tahun dan ekspor **Sertifikat Valuasi PDF Resmi**.
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Panduan Memulai
+## Panduan Memulai
 
 ### 1. Instalasi Dependensi
 ```bash
@@ -40,7 +40,7 @@ python -m unittest tests/test_car_pipeline.py
 
 ---
 
-## 📂 Struktur Repositori
+## Struktur Repositori
 
 ```text
 ├── models/               # SQLAlchemy Models (Master Brands, Models, Variants, Listings, Lots)

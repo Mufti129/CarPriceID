@@ -32,14 +32,14 @@ from analytics.alert_dispatcher import alert_dispatcher
 # PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="CarPrice ID | Used Car Intelligence Platform",
-    page_icon="🚗",
+    page_title="CarPrice ID — Used Car Intelligence & Valuation Platform",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ==============================================================================
-# MODERN EXECUTIVE UI/UX STYLING (HIGH CONTRAST, BALANCED SLATE/NAVY THEME)
+# PROFESSIONAL EXECUTIVE UI/UX STYLING (CLEAN SLATE THEME, NO EMOJIS, BALANCED LAYOUT)
 # ==============================================================================
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,32 +51,33 @@ st.markdown("""
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .block-container {
-        padding-top: 1.4rem;
-        padding-bottom: 3rem;
+        padding-top: 1.2rem;
+        padding-bottom: 2.5rem;
         max-width: 1440px;
     }
+    
+    /* Header AppBar */
     .hero-appbar {
-        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
-        border-radius: 16px;
-        padding: 24px 28px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a8a 100%);
+        border-radius: 12px;
+        padding: 22px 26px;
         color: #ffffff;
-        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
-        margin-bottom: 22px;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.4);
+        margin-bottom: 20px;
         position: relative;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .hero-title {
-        font-size: 1.75rem;
+        font-size: 1.65rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         margin: 0;
         color: #ffffff !important;
-        line-height: 1.25;
+        line-height: 1.2;
     }
     .hero-subtitle {
-        font-size: 0.92rem;
-        color: #dbeafe !important;
+        font-size: 0.88rem;
+        color: #cbd5e1 !important;
         margin-top: 6px;
         font-weight: 400;
         line-height: 1.45;
@@ -85,99 +86,110 @@ st.markdown("""
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
-        margin-top: 14px;
+        margin-top: 12px;
     }
     .hero-tag-pill {
-        background: rgba(255, 255, 255, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        color: #ffffff;
-        font-size: 0.76rem;
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: #e2e8f0;
+        font-size: 0.72rem;
         font-weight: 600;
-        padding: 4px 12px;
-        border-radius: 20px;
+        padding: 3px 10px;
+        border-radius: 6px;
+        letter-spacing: 0.02em;
     }
+
+    /* Executive KPI Cards */
     .kpi-card {
         background: #1e293b;
         border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 16px 18px;
+        border-radius: 10px;
+        padding: 14px 16px;
         margin-bottom: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        min-height: 95px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .kpi-label {
-        font-size: 0.78rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 700;
         color: #94a3b8;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
     }
     .kpi-value {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 1.65rem;
+        font-size: 1.55rem;
         font-weight: 700;
         color: #f8fafc;
-        margin: 4px 0 2px 0;
+        margin: 3px 0 1px 0;
+        line-height: 1.15;
     }
     .kpi-subtext {
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         color: #64748b;
     }
+
+    /* Valuation Box */
     .val-hero-container {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1.5px solid #3b82f6;
-        border-radius: 14px;
-        padding: 24px 26px;
-        margin-top: 18px;
-        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+        border: 1px solid #3b82f6;
+        border-radius: 12px;
+        padding: 22px 24px;
+        margin-top: 14px;
+        margin-bottom: 16px;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
     }
     .val-price-hero {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 800;
         color: #38bdf8;
         line-height: 1.15;
-        margin: 8px 0;
+        margin: 6px 0;
     }
+
+    /* Sidebar Clean Styling */
     section[data-testid="stSidebar"] {
         background-color: #0f172a;
         border-right: 1px solid #334155;
     }
     .sidebar-brand-box {
-        padding: 8px 0 14px 0;
+        padding: 6px 0 12px 0;
     }
     .sidebar-title {
-        font-size: 1.20rem;
+        font-size: 1.15rem;
         font-weight: 800;
         color: #f8fafc;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.01em;
     }
     .sidebar-desc {
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         color: #94a3b8;
         margin-top: 4px;
-        line-height: 1.4;
+        line-height: 1.35;
     }
     .status-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(16, 185, 129, 0.14);
-        border: 1px solid rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.30);
         color: #34d399;
-        font-size: 0.70rem;
+        font-size: 0.68rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        padding: 3px 10px;
-        border-radius: 20px;
-        margin-top: 10px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-top: 8px;
     }
     .status-dot {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
         background-color: #10b981;
         border-radius: 50%;
-        box-shadow: 0 0 6px #10b981;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -187,25 +199,25 @@ def format_dark_chart(fig, show_legend=False, y_title=None, x_title=None, is_pri
     fig.update_layout(
         paper_bgcolor="rgba(30, 41, 59, 0.55)",
         plot_bgcolor="rgba(30, 41, 59, 0.55)",
-        font=dict(family="Plus Jakarta Sans", color="#94a3b8", size=12),
-        margin=dict(t=25, b=25, l=25, r=25),
+        font=dict(family="Plus Jakarta Sans", color="#94a3b8", size=11),
+        margin=dict(t=20, b=20, l=20, r=20),
         showlegend=show_legend
     )
     fig.update_xaxes(
-        gridcolor="rgba(255, 255, 255, 0.07)",
+        gridcolor="rgba(255, 255, 255, 0.06)",
         zerolinecolor="rgba(255, 255, 255, 0.08)",
         title=x_title if x_title else None
     )
     if is_price_axis:
         fig.update_yaxes(
-            gridcolor="rgba(255, 255, 255, 0.07)",
+            gridcolor="rgba(255, 255, 255, 0.06)",
             zerolinecolor="rgba(255, 255, 255, 0.08)",
             title=y_title if y_title else "Price (IDR)",
             tickformat=",.0f"
         )
     else:
         fig.update_yaxes(
-            gridcolor="rgba(255, 255, 255, 0.07)",
+            gridcolor="rgba(255, 255, 255, 0.06)",
             zerolinecolor="rgba(255, 255, 255, 0.08)",
             title=y_title if y_title else None
         )
@@ -294,9 +306,9 @@ def load_all_listings_df() -> pd.DataFrame:
                 "Fuel": r.fuel_type or "Bensin",
                 "Tax_Status": r.tax_status or "Unknown",
                 "BPKB": "Lengkap" if r.has_bpkb else "Tidak Ada",
-                "Flood_Free": "Ya (Bebas Banjir)" if r.flood_free else "Tidak",
-                "Accident_Free": "Ya (Bebas Tabrak)" if r.accident_free else "Tidak",
-                "Service_Record": "Ada (Resmi)" if r.service_record else "Tidak Ada",
+                "Flood_Free": "Bebas Banjir" if r.flood_free else "Tidak",
+                "Accident_Free": "Bebas Tabrak" if r.accident_free else "Tidak",
+                "Service_Record": "Resmi" if r.service_record else "Tidak Ada",
                 "Plate_Code": r.plate_region or "-",
                 "Province": r.province or "-",
                 "City": r.city or "-",
@@ -402,7 +414,7 @@ def load_all_auction_lots_df() -> pd.DataFrame:
 with st.sidebar:
     st.markdown("""
     <div class="sidebar-brand-box">
-        <div class="sidebar-title">🚗 CARPRICE ID</div>
+        <div class="sidebar-title">CARPRICE ID</div>
         <div class="sidebar-desc">Indonesian Used Car Market Intelligence & Hedonic Valuation Platform</div>
         <div class="status-pill"><div class="status-dot"></div> SYSTEM OPERATIONAL</div>
     </div>
@@ -427,9 +439,9 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("""
-    <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-        <div style="color: #38bdf8; font-size: 0.80rem; font-weight: 700;">Catalog Scope</div>
-        <div style="color: #94a3b8; font-size: 0.74rem; margin-top: 4px;">10 Brands | 23 Models | 76 Variants | MPV, SUV, LCGC, EV (2014–2026)</div>
+    <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
+        <div style="color: #38bdf8; font-size: 0.76rem; font-weight: 700; text-transform: uppercase;">Catalog Scope</div>
+        <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 3px; line-height: 1.35;">10 Brands | 23 Models | 76 Variants | MPV, SUV, LCGC, EV (2014–2026)</div>
     </div>
     """, unsafe_allow_html=True)
     st.caption("Engine: Python 3.13 | ML: V7 Hedonic Residual | DB: SQLite ORM")
@@ -501,7 +513,7 @@ if menu == "Market Overview":
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("### 📊 Macro Automotive Distributions")
+        st.markdown("### Macro Automotive Distributions")
         c1, c2 = st.columns(2)
 
         with c1:
@@ -516,7 +528,7 @@ if menu == "Market Overview":
             st.plotly_chart(format_dark_chart(fig_brand, show_legend=False), use_container_width=True)
 
         with c2:
-            st.markdown("##### Fuel / Powertrain Segmentation (BBM)")
+            st.markdown("##### Fuel / Powertrain Segmentation")
             fuel_counts = cash_df["Fuel"].value_counts().reset_index()
             fuel_counts.columns = ["Fuel", "Count"]
             fig_fuel = px.bar(
@@ -586,7 +598,7 @@ elif menu == "Fair Market Value (FMV) Calculator":
             sel_km = st.number_input("5. Odometer (Kilometer)", min_value=1000, max_value=500000, value=default_km, step=5000)
             sel_region = st.selectbox("6. Wilayah Domisili", get_all_regions(), index=0)
 
-        with st.expander("⚙️ Parameter Kondisi Fisik, Legalitas & Riwayat Kendaraan (Klik untuk ubah)", expanded=True):
+        with st.expander("Parameter Kondisi Fisik, Legalitas & Riwayat Kendaraan (Klik untuk ubah)", expanded=True):
             ec1, ec2, ec3, ec4 = st.columns(4)
             with ec1:
                 sel_trans = st.selectbox("Transmisi Unit", ["Automatic", "Manual"], index=0 if (variant_obj and "Auto" in variant_obj.transmission_type) else 0)
@@ -595,11 +607,11 @@ elif menu == "Fair Market Value (FMV) Calculator":
                 sel_tax = st.selectbox("Status Pajak STNK", ["Pajak Hidup / Panjang", "Pajak Mati 1 Tahun", "Pajak Mati 2+ Tahun"], index=0)
                 sel_bpkb = st.selectbox("Kelengkapan BPKB", ["Lengkap (Ada BPKB & Faktur)", "Non-BPKB (STNK Only / Hilang)"], index=0)
             with ec3:
-                sel_flood = st.checkbox("✅ Jaminan Bebas Banjir 100%", value=True)
-                sel_accident = st.checkbox("✅ Jaminan Bebas Tabrak Sasis", value=True)
+                sel_flood = st.checkbox("Jaminan Bebas Banjir 100%", value=True)
+                sel_accident = st.checkbox("Jaminan Bebas Tabrak Sasis", value=True)
             with ec4:
-                sel_service = st.checkbox("📘 Service Record Resmi", value=True)
-                sel_first_hand = st.checkbox("👤 Tangan Pertama Dari Baru", value=True)
+                sel_service = st.checkbox("Service Record Resmi", value=True)
+                sel_first_hand = st.checkbox("Tangan Pertama Dari Baru", value=True)
 
         if variant_obj:
             msrp = float(variant_obj.official_msrp_new) if variant_obj.official_msrp_new else 300000000.0
@@ -627,24 +639,23 @@ elif menu == "Fair Market Value (FMV) Calculator":
 
             st.markdown(f"""
             <div class="val-hero-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
                     <div>
-                        <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">ESTIMATED FAIR MARKET VALUE (FMV)</div>
+                        <div style="color: #94a3b8; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">ESTIMATED FAIR MARKET VALUE (FMV)</div>
                         <div class="val-price-hero">Rp {fmv_display:,.0f}</div>
-                        <div style="color: #cbd5e1; font-size: 0.88rem;">
+                        <div style="color: #cbd5e1; font-size: 0.84rem;">
                             Bargain Buy Target (P25): <strong style="color: #34d399;">Rp {val_res['price_p25_deal']*reg_res['multiplier']:,.0f}</strong> &nbsp;|&nbsp; 
                             Showroom Pristine (P75): <strong style="color: #a78bfa;">Rp {val_res['price_p75_pristine']*reg_res['multiplier']:,.0f}</strong>
                         </div>
                     </div>
-                    <div style="text-align: right; margin-top: 10px;">
-                        <div style="color: #94a3b8; font-size: 0.80rem;">Depresiasi dari MSRP Baru (Rp {msrp:,.0f})</div>
-                        <div style="font-family: 'JetBrains Mono'; font-size: 1.6rem; font-weight: 800; color: #f59e0b;">-{val_res['real_depreciation_pct']}%</div>
+                    <div style="text-align: right;">
+                        <div style="color: #94a3b8; font-size: 0.78rem;">Depresiasi dari MSRP Baru (Rp {msrp:,.0f})</div>
+                        <div style="font-family: 'JetBrains Mono'; font-size: 1.55rem; font-weight: 800; color: #f59e0b;">-{val_res['real_depreciation_pct']}%</div>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            st.write("")
             unit_info = {
                 "brand": sel_brand,
                 "model": sel_model,
@@ -663,16 +674,16 @@ elif menu == "Fair Market Value (FMV) Calculator":
             try:
                 pdf_bytes = generate_car_pdf_certificate(unit_info, val_res)
                 st.download_button(
-                    label="📄 Unduh Sertifikat Valuasi Resmi (PDF)",
+                    label="Unduh Sertifikat Valuasi Resmi (PDF)",
                     data=pdf_bytes,
                     file_name=f"CarPriceID_Valuation_{sel_brand}_{sel_model}_{sel_year}.pdf",
                     mime="application/pdf"
                 )
             except Exception as e:
-                st.caption(f"PDF Generator ready: {e}")
+                st.caption(f"PDF Generator status: {e}")
 
             # 10-Year Residual Value Curve
-            st.markdown("#### 📉 10-Year Residual Value Forecast (Kurva Proyeksi Nilai Sisa)")
+            st.markdown("#### 10-Year Residual Value Forecast (Kurva Proyeksi Nilai Sisa)")
             curve_data = ml_car_model_v7.generate_residual_forecast_curve(msrp, sel_fuel, sel_trans)
             df_curve = pd.DataFrame(curve_data)
 
@@ -682,8 +693,8 @@ elif menu == "Fair Market Value (FMV) Calculator":
                 y=df_curve["projected_fmv"],
                 mode='lines+markers',
                 name='Nilai Pasar Proyeksi (IDR)',
-                line=dict(color='#38bdf8', width=3),
-                marker=dict(size=7)
+                line=dict(color='#38bdf8', width=2.5),
+                marker=dict(size=6)
             ))
             st.plotly_chart(format_dark_chart(fig_curve, show_legend=True, x_title="Tahun Kendaraan", y_title="Harga Pasar Wajar (IDR)", is_price_axis=True), use_container_width=True)
 
@@ -728,46 +739,46 @@ elif menu == "Market Price Monitoring & Quartiles":
 
         corridor = engine.calculate_3tier_price_corridor(var_id, sel_year_mon)
 
-        st.markdown("### 🏛️ 3-Tier Price Corridor Architecture")
+        st.markdown("### 3-Tier Price Corridor Architecture")
         t1, t2, t3 = st.columns(3)
         with t1:
             st.markdown(f"""
-            <div class="kpi-card" style="border-left: 4px solid #94a3b8;">
+            <div class="kpi-card" style="border-left: 3px solid #94a3b8;">
                 <div class="kpi-label">Tier 1: Clearance Floor Limit</div>
-                <div class="kpi-value" style="font-size: 1.45rem;">Rp {corridor['tier1_clearance_floor']:,.0f}</div>
+                <div class="kpi-value" style="font-size: 1.40rem;">Rp {corridor['tier1_clearance_floor']:,.0f}</div>
                 <div class="kpi-subtext">Harga pembukaan lelang</div>
             </div>
             """, unsafe_allow_html=True)
         with t2:
             st.markdown(f"""
-            <div class="kpi-card" style="border-left: 4px solid #38bdf8;">
+            <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
                 <div class="kpi-label">Tier 2: Wholesale Hammer Price</div>
-                <div class="kpi-value" style="font-size: 1.45rem; color: #38bdf8;">Rp {corridor['tier2_wholesale_hammer']:,.0f}</div>
+                <div class="kpi-value" style="font-size: 1.40rem; color: #38bdf8;">Rp {corridor['tier2_wholesale_hammer']:,.0f}</div>
                 <div class="kpi-subtext">Modal lelang + fee (Rp {corridor['total_cogs_modal']:,.0f})</div>
             </div>
             """, unsafe_allow_html=True)
         with t3:
             st.markdown(f"""
-            <div class="kpi-card" style="border-left: 4px solid #34d399;">
+            <div class="kpi-card" style="border-left: 3px solid #34d399;">
                 <div class="kpi-label">Tier 3: Retail Fair Market Value</div>
-                <div class="kpi-value" style="font-size: 1.45rem; color: #34d399;">Rp {corridor['tier3_retail_fmv']:,.0f}</div>
+                <div class="kpi-value" style="font-size: 1.40rem; color: #34d399;">Rp {corridor['tier3_retail_fmv']:,.0f}</div>
                 <div class="kpi-subtext">P25: Rp {corridor['tier3_retail_p25']:,.0f} | P75: Rp {corridor['tier3_retail_p75']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("### 💰 Estimasi Margin Profit Showroom Dealer")
+        st.markdown("### Estimasi Margin Profit Showroom Dealer")
         m1, m2 = st.columns(2)
         with m1:
             st.metric("Gross Profit Spread", f"Rp {corridor['dealer_gross_spread_idr']:,.0f}", f"{corridor['dealer_gross_margin_pct']:.1f}% Gross Margin")
         with m2:
-            st.metric("Net Profit (Setelah Salon & Rekondisi Rp 4jt)", f"Rp {corridor['dealer_net_profit_idr']:,.0f}", f"{corridor['dealer_net_margin_pct']:.1f}% Net Margin")
+            st.metric("Net Profit (Setelah Rekondisi Rp 4jt)", f"Rp {corridor['dealer_net_profit_idr']:,.0f}", f"{corridor['dealer_net_margin_pct']:.1f}% Net Margin")
 
         # Boxplot listings aktual
         df_retail = load_all_listings_df()
         if not df_retail.empty:
             sub_df = df_retail[(df_retail["Variant"] == sel_v_obj.MasterVariant.variant_name) & (df_retail["Price_Type"] == "Cash")]
             if not sub_df.empty:
-                st.markdown("#### 📦 Distribusi Sebaran Listing Pasar Aktual (Tukey IQR Boxplot)")
+                st.markdown("#### Distribusi Sebaran Listing Pasar Aktual (Tukey IQR Boxplot)")
                 fig_box = px.box(
                     sub_df, x="Year", y="Price", color="Year",
                     points="all", hover_data=["Title", "City", "Mileage_KM"]
@@ -801,7 +812,7 @@ elif menu == "Bargain & Arbitrage Opportunities":
         deals = engine.get_top_arbitrage_deals(min_discount_pct=min_disc, limit=max_results)
 
         if deals:
-            st.success(f"Ditemukan **{len(deals)} Peluang Hot Deal** dengan potensi keuntungan margin tinggi!")
+            st.success(f"Ditemukan {len(deals)} Peluang Hot Deal dengan potensi keuntungan margin tinggi.")
             df_deals = pd.DataFrame(deals)
 
             st.dataframe(
@@ -881,7 +892,7 @@ elif menu == "Raw Scraped Dataset Explorer":
         st.dataframe(df_retail, use_container_width=True)
         csv = df_retail.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Unduh Dataset Lengkap (.CSV)",
+            label="Unduh Dataset Lengkap (CSV)",
             data=csv,
             file_name=f"CarPriceID_Dataset_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
@@ -900,22 +911,22 @@ elif menu == "Live Scraper & Crawler Center":
 
     col_s1, col_s2 = st.columns(2)
     with col_s1:
-        st.markdown("### 🔍 Live OLX Indonesia Search")
-        query_input = st.text_input("Kata Kunci Pencarian (e.g. 'Innova Reborn Diesel', 'Veloz 2023')", value="Innova Reborn")
-        if st.button("🚀 Jalankan Live OLX Scraper"):
+        st.markdown("### Live OLX Indonesia Search")
+        query_input = st.text_input("Kata Kunci Pencarian (contoh: 'Innova Reborn Diesel', 'Veloz 2023')", value="Innova Reborn")
+        if st.button("Jalankan Live OLX Scraper"):
             scraper = OLXCarScraper()
             with st.spinner("Mengambil listing dari OLX API..."):
                 results = scraper.search_listings(query=query_input, page_size=10)
-                st.success(f"Berhasil mengekstrak {len(results)} listing live!")
+                st.success(f"Berhasil mengekstrak {len(results)} listing live.")
                 st.json(results[:3])
 
     with col_s2:
-        st.markdown("### 🏛️ Live Auction Lot Crawler")
-        if st.button("🚀 Harvest Live Balai Lelang"):
+        st.markdown("### Live Auction Lot Crawler")
+        if st.button("Harvest Live Balai Lelang"):
             auc_scraper = CarAuctionScraper()
             with st.spinner("Crawling pool lelang..."):
                 lots = auc_scraper.fetch_live_lots()
-                st.success(f"Berhasil mengambil {len(lots)} lot lelang aktif!")
+                st.success(f"Berhasil mengambil {len(lots)} lot lelang aktif.")
                 st.json(lots[:2])
 
 # ==============================================================================
