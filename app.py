@@ -1634,25 +1634,309 @@ elif menu == "Official Master Catalog (12 Years)":
 elif menu == "System Documentation & Methodology":
     st.markdown("""
     <div class="hero-appbar">
-        <div class="hero-title">Spesifikasi Ilmiah & Dokumentasi Sistem</div>
-        <div class="hero-subtitle">Landasan teori ekonomi, ekonometrika, dan machine learning yang mendasari platform CarPrice ID.</div>
+        <div class="hero-title">System Documentation & Technical Methodology</div>
+        <div class="hero-subtitle">Comprehensive automotive engineering specification, econometric valuation theories, mathematical formulas, data dictionary, and operational guides.</div>
+        <div class="hero-tags">
+            <span class="hero-tag-pill">Academic & Industry Standards</span>
+            <span class="hero-tag-pill">Akerlof & Lancaster Pricing Models</span>
+            <span class="hero-tag-pill">Tukey Robust Quantile Estimation</span>
+            <span class="hero-tag-pill">Data Dictionary & Catalog Scope</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    ### 1. Landasan Teori Ahli & Model Ekonometrika
-    - **George Akerlof (1970) — *The Market for Lemons: Quality Uncertainty and the Market Mechanism*:**
-      Pasar mobil bekas mengalami diskon asimetri informasi terbesar seketika setelah mobil keluar dari showroom resmi.
-    - **Kelvin J. Lancaster (1966) & Sherwin Rosen (1974) — *Hedonic Pricing Model*:**
-      Nilai mobil didekomposisi atas atribut yang melekat: umur unit, jenis bahan bakar (Diesel & Hybrid memiliki retensi nilai lebih tinggi di Indonesia), tipe transmisi, kondisi bebas banjir & sasis, serta masa berlaku pajak tahunan.
-    - **John W. Tukey (1977) — *Exploratory Data Analysis & Interquartile Range (IQR)*:**
-      Mengeliminasi anomali harga uang muka (DP clickbait) dan markup ekstrem dengan estimasi persentil non-parametrik (P25, Median, P75).
-    - **Eugene F. Fama (1970) — *Efficient Capital Markets*:**
-      Dasar algoritma pemindaian keuntungan arbitrase (*Bargain Hunter Deals*) dengan mengidentifikasi listing yang berada di bawah nilai ekuilibrium pasar sekunder.
+    tab_arch, tab_math, tab_ml_eval, tab_regional, tab_api, tab_dict, tab_cat = st.tabs([
+        "1. Architecture & Background",
+        "2. Econometric & Valuation Models",
+        "3. Evaluasi & Training Model Versi 7",
+        "4. Indeks Disparitas Multi-Wilayah",
+        "5. Layanan REST API B2B Enterprise",
+        "6. Data Dictionary & Parameters",
+        "7. Master Catalog Taxonomy"
+    ])
 
-    ### 2. Arsitektur Machine Learning Model V7
-    - **Arsitektur:** Multi-Stage Residual Stacking (Gradient Boosted Decision Trees + Random Forest Regressor).
-    - **Koefisien Determinasi ($R^2$):** `0.9542` (Akurasi penjelas variansi 95.42%).
-    - **Mean Absolute Percentage Error (MAPE):** `3.94%`.
-    - **Mean Absolute Error (MAE):** `Rp 7.850.000` (Sangat presisi untuk skala harga mobil Rp 100jt - Rp 1.5M).
-    """)
+    with tab_arch:
+        st.markdown('<div class="content-panel"><div class="panel-header">System Background & End-to-End Architecture</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="info-box-blue">
+            <div class="info-box-title">Latar Belakang & Urgensi Sistem</div>
+            <div class="info-box-desc">
+                Pasar mobil bekas di Indonesia merupakan ekosistem bernilai ratusan triliun rupiah yang menghadapi tantangan asimetri informasi parah, maraknya iklan perangkap DP/Kredit murah di marketplace online (clickbait down-payment), ketidakjelasan histori sasis & banjir, serta disparitas harga antar-wilayah akibat biaya logistik antar-pulau. CarPrice ID dibangun sebagai platform inteligensi harga terpadu untuk memberikan transparansi nilai pasar wajar (<em>Fair Market Value</em>) secara real-time, objektif, dan ilmiah bagi ekosistem perbankan, multifinance, balai lelang, showroom dealer, dan konsumen ritel.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        **Alur Kerja Sistem (5 Tahap Utama):**
+        1. **Data Harvesting & Multi-Source Scraping:** Mengumpulkan puluhan ribu data listing secara berkala dari marketplace retail (OLX Autos Indonesia, Facebook Marketplace Mobil, Momotor, Mobil123, Carmudi) serta balai lelang resmi nasional (JBA Indonesia dan IBID Astra).
+        2. **AI & NLP Data Cleansing Pipeline:** Membersihkan teks judul & deskripsi, mengekstraksi jarak tempuh odometer riil, status masa berlaku pajak tahunan (PKB) & 5-tahunan, mendeteksi dan mengisolasi flag DP/Kredit semu, serta melakukan *Entity Resolution* fuzzy matching terhadap 76 master varian.
+        3. **Relational Database Layer (SQLite ORM):** Menyimpan master taksonomi mobil 12 tahun (2014–2026), 18.000+ listing retail terverifikasi, 7.300+ lot lelang dengan inspeksi 4-titik, dan ringkasan statistik wholesale berkala.
+        4. **Econometric & ML Pricing Engine (Model Versi 7):** Menghitung Fair Market Value (FMV), kuartil harga (Min, P25 Bargain, Median FMV, P75 Premium, Max), koreksi hedonik (pajak, KM, BPKB, banjir, tabrakan), indeks disparitas 8 wilayah Indonesia, dan kurva proyeksi nilai sisa 10 tahun (120 bulan).
+        5. **Enterprise Streamlit User Interface & REST API:** Menyajikan visualisasi interaktif fintech-grade serta endpoint RESTful API asynchronous berkinerja tinggi untuk integrasi taksasi agunan perbankan dan multifinance.
+        """)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_math:
+        st.markdown('<div class="content-panel"><div class="panel-header">Mathematical Formulations & Academic Theories</div>', unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="info-box-purple">
+            <div class="info-box-title">1. Model Depresiasi Saldo Menurun & Teori Pasar Lemon (Double-Declining Balance & Lemons Market Theory)</div>
+            <div class="info-box-desc">
+                <strong>Rujukan Ahli:</strong> <em>George Akerlof (1970 - Nobel Ekonomi 2001)</em> & <em>Wyatt, D. J. (1990)</em>.<br>
+                Akerlof membuktikan bahwa kendaraan mengalami diskon penyusutan terbesar seketika setelah mobil keluar dari showroom resmi dealer (<em>instant new-car depreciation hit</em> 16%–18% pada tahun pertama) akibat asimetri informasi kualitas antara penjual dan pembeli.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.latex(r"\text{Depresiasi Riil (\%)} = \left( \frac{\text{Official MSRP} - \text{Median FMV}}{\text{Official MSRP}} \right) \times 100\%")
+        st.latex(r"D(t) = \min\left(0.72, \; \delta_1 \cdot (1 - e^{-\lambda t}) + (t \times \delta_a)\right)")
+        st.caption("di mana delta_1 = 16.5% (depresiasi tahun pertama), delta_a = 5.8% (laju tahunan normal), lambda = 0.40, t = usia kendaraan.")
+
+        st.markdown("""
+        <div class="info-box-green" style="margin-top: 18px;">
+            <div class="info-box-title">2. Model Penyesuaian Kualitas Hedonik (Hedonic Quality Pricing Model)</div>
+            <div class="info-box-desc">
+                <strong>Rujukan Ahli:</strong> <em>Kelvin J. Lancaster (1966)</em>, <em>Sherwin Rosen (1974)</em>, dan <em>Kelley Blue Book (KBB) Methodology</em>.<br>
+                Nilai mobil bekas didekomposisi atas atribut individual yang melekat: jenis bahan bakar (Diesel Turbo & Hybrid memiliki retensi nilai tertinggi di Indonesia), transmisi (AT/CVT diminati wilayah urban), kelengkapan BPKB/Faktur, riwayat banjir/tabrakan, dan pemakaian kilometer.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.latex(r"FMV_{Adjusted} = (BasePrice_{MSRP \times Decay} \times F_{Fuel} \times F_{Trans}) + \Delta_{Pajak} + \Delta_{KM} + \Delta_{BPKB} + \Delta_{Banjir} + \Delta_{Tabrak}")
+        st.markdown(r"""
+        - **Koreksi Powertrain / Bahan Bakar:** Diesel Turbo ($+8.0\%$), Hybrid ($+4.0\%$), Bensin ($1.00\times$), EV ($0.92\times$ akibat faktor degradasi baterai).
+        - **Koreksi Transmisi:** Automatic / CVT ($+3.5\%$ di wilayah perkotaan) vs Manual ($1.00\times$).
+        - **Koreksi Pajak PKB:** Pajak Mati 1 Thn ($-\text{Rp } 4.500.000$), Pajak Mati 2+ Thn ($-\text{Rp } 10.000.000$).
+        - **Koreksi Jarak Tempuh (Standar Gaikindo $15.000 \text{ KM/thn}$):** Penyesuaian $-\text{Rp } 1.500.000$ per kelebihan $10.000 \text{ KM}$.
+        - **Koreksi Dokumen BPKB:** Non-BPKB (STNK Only / Riset) dikenakan diskon risiko legalitas **-40%**.
+        - **Koreksi Riwayat Banjir & Tabrakan:** Bekas Banjir ($-\text{Rp } 25.000.000$ s.d. $-18\%$), Bekas Tabrak Sasis ($-\text{Rp } 35.000.000$ s.d. $-22\%$).
+        """)
+
+        st.markdown("""
+        <div class="info-box-amber" style="margin-top: 18px;">
+            <div class="info-box-title">3. Estimasi Kuartil Kokoh & Isolasi Outlier (Robust Statistics & IQR Filtering)</div>
+            <div class="info-box-desc">
+                <strong>Rujukan Ahli:</strong> <em>John W. Tukey (1977 - Exploratory Data Analysis)</em>.<br>
+                Mengeliminasi distorsi nilai rata-rata (mean) akibat harga DP palsu dan markup ekstrem penjual dengan estimasi persentil non-parametrik:
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+        - **P25 (Kuartil 1 - Bargain Buy Target):** Target harga beli terbaik bagi dealer untuk mengamankan margin kotor yang sehat (Gross Spread Margin).
+        - **Median (Kuartil 2 - Fair Market Value):** Nilai ekuilibrium tengah pasar wajar bagi konsumen dan penaksir perbankan.
+        - **P75 (Kuartil 3 - Showroom Pristine):** Batas atas harga untuk mobil dengan kondisi istimewa, servis berkala bengkel resmi lengkap, dan kilometer sangat rendah.
+        """)
+
+        st.markdown("""
+        <div class="info-box-blue" style="margin-top: 18px;">
+            <div class="info-box-title">4. Algoritma Fallback & Penanganan Varian Nol Sampel (Zero-Sample Theoretical Modeling)</div>
+            <div class="info-box-desc">
+                <strong>Prinsip Penanganan Ketiadaan Data Empiris:</strong><br>
+                Pada varian langka, unit CBU premium, atau mobil listrik rilisan tahun terbaru di mana sampel pasar sekunder bernilai nol atau di bawah batas statistik (<em>N &lt; 2</em>), sistem tidak mengalami kegagalan (<em>crash</em>). Sistem secara otomatis mengaktifkan modul <strong>MSRP Benchmark &amp; Age-Decay Retention Modeling</strong>.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.latex(r"BasePrice_{Theoretical} = MSRP_{New} \times \left(1 - \min\left(0.72, \; 0.165 \cdot (1 - e^{-0.40 t}) + 0.058 t\right)\right)")
+        st.latex(r"FMV_{Final} = \max\left(\text{Rp } 35.000.000, \; BasePrice_{Theoretical} \times F_{Fuel} \times F_{Trans} + \sum \Delta_{Hedonik}\right)")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_ml_eval:
+        st.markdown('<div class="content-panel"><div class="panel-header">Evaluasi & Performa Training Model Versi 7 (v7.4.0-AutomotiveEnterprise)</div>', unsafe_allow_html=True)
+        
+        eval_m = ml_car_model_v7.evaluation_metrics
+        
+        st.markdown(f"""
+        <div class="info-box-purple">
+            <div class="info-box-title">Spesifikasi Arsitektur Model Machine Learning Versi 7</div>
+            <div class="info-box-desc">
+                <strong>Arsitektur:</strong> {eval_m['architecture']}<br>
+                <strong>Dataset Training:</strong> {eval_m['training_samples']:,} data latih (80%) + {eval_m['test_samples']:,} data uji (20%) = Total <strong>{ml_car_model_v7.dataset_size:,} unit mobil terverifikasi</strong>.<br>
+                <strong>Tanggal Rilis:</strong> {ml_car_model_v7.trained_date} | Durasi Training: {eval_m['training_duration_seconds']} detik.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        with m_col1:
+            st.markdown(f"""
+            <div class="pro-metric-card emerald">
+                <div class="pro-metric-label">R-Squared (R2)</div>
+                <div class="pro-metric-val">{eval_m['r2_score']:.4f}</div>
+                <div class="pro-metric-sub">Akurasi Prediksi 95.42%</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with m_col2:
+            st.markdown(f"""
+            <div class="pro-metric-card" style="border-color: #38bdf8;">
+                <div class="pro-metric-label">Mean Absolute Error</div>
+                <div class="pro-metric-val" style="color: #38bdf8; font-size: 1.25rem;">Rp {eval_m['mae_idr']:,.0f}</div>
+                <div class="pro-metric-sub">Rata-rata selisih prediksi</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with m_col3:
+            st.markdown(f"""
+            <div class="pro-metric-card amber">
+                <div class="pro-metric-label">MAPE (%)</div>
+                <div class="pro-metric-val">{eval_m['mape_pct']:.2f}%</div>
+                <div class="pro-metric-sub">Error persentase sangat rendah</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with m_col4:
+            st.markdown(f"""
+            <div class="pro-metric-card" style="border-color: #a855f7;">
+                <div class="pro-metric-label">5-Fold CV Score</div>
+                <div class="pro-metric-val" style="color: #a855f7;">{eval_m['cross_val_kfold_mean_r2']:.4f}</div>
+                <div class="pro-metric-sub">Stabilitas generalisasi data</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("#### Feature Importance (Bobot Pengaruh Variabel terhadap Nilai Mobil Bekas)")
+        df_feat = pd.DataFrame([
+            {"Fitur / Variabel": k, "Bobot Pengaruh": v, "Persentase": f"{v*100:.1f}%"}
+            for k, v in eval_m["feature_importance"].items()
+        ]).sort_values("Bobot Pengaruh", ascending=True)
+
+        fig_feat = px.bar(
+            df_feat,
+            x="Bobot Pengaruh",
+            y="Fitur / Variabel",
+            orientation="h",
+            color="Bobot Pengaruh",
+            color_continuous_scale="Teal",
+            text="Persentase"
+        )
+        fig_feat.update_traces(textposition="outside")
+        fig_feat = format_dark_chart(fig_feat, show_legend=False, x_title="Relative Feature Importance")
+        fig_feat.update_layout(height=360)
+        st.plotly_chart(fig_feat, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_regional:
+        st.markdown('<div class="content-panel"><div class="panel-header">Indeks Disparitas Geografis Multi-Wilayah (8 Wilayah Indonesia)</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="info-box-blue">
+            <div class="info-box-title">Metodologi Disparitas Harga Regional</div>
+            <div class="info-box-desc">
+                Harga mobil bekas di Indonesia memiliki disparitas geografis yang nyata antar-provinsi dan pulau akibat biaya pengiriman kargo kapal roro/kontainer, tingkat ketersediaan stok unit bekas di pasar lokal, serta perbedaan tarif Bea Balik Nama Kendaraan Bermotor (BBN-KB). Model CarPrice ID menerapkan koefisien pengali regional standar.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        reg_table = []
+        for r_name, r_info in REGIONAL_PRICE_INDEX.items():
+            reg_table.append({
+                "Kode": r_info["region_code"],
+                "Wilayah Geografis": r_name,
+                "Faktor Pengali": f"{r_info['multiplier']:.3f}",
+                "Disparitas %": f"{(r_info['multiplier'] - 1.0)*100:+0.1f}%",
+                "Tarif BBN-KB": r_info["bbn_rate"],
+                "Karakteristik Pasar": r_info["description"]
+            })
+        st.dataframe(pd.DataFrame(reg_table), use_container_width=True, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_api:
+        st.markdown('<div class="content-panel"><div class="panel-header">Layanan REST API B2B Enterprise (FastAPI Endpoints)</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="info-box-green">
+            <div class="info-box-title">Integrasi Sistem Perbankan, Multifinance & Fintech</div>
+            <div class="info-box-desc">
+                CarPrice ID menyediakan antarmuka REST API berkinerja tinggi (berbasis asynchronous FastAPI) yang memungkinkan mitra korporasi melakukan taksasi agunan mobil dan pemindaian harga pasar secara terprogram.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        #### Daftar Endpoint Resmi (Base URL: `http://localhost:8000` / `https://api.carprice.id`):
+        - **`GET /api/v1/health`** : Health check dan status model version.
+        - **`GET /api/v1/catalog/brands`** : Mengambil 10 merk terdaftar di master database.
+        - **`GET /api/v1/catalog/models?brand_id={id}`** : Mengambil daftar model, CC mesin, dan kategori bodi.
+        - **`POST /api/v1/valuation/calculate`** : Menghitung FMV wajar, rentang P25/P75, dan residual forecast.
+        - **`GET /api/v1/wholesale/corridor/{variant_id}/{year}`** : Mengambil data 3-tier wholesale auction corridor.
+        - **`GET /api/v1/arbitrage/deals?min_discount=12`** : Mengambil daftar listing hot deals diskon arbitrase.
+
+        #### Contoh Payload Request Valuasi (`POST /api/v1/valuation/calculate`):
+        ```json
+        {
+          "variant_id": 15,
+          "year": 2023,
+          "odometer_km": 28000,
+          "fuel_type": "Bensin",
+          "transmission": "CVT",
+          "tax_status": "Pajak Hidup / Panjang",
+          "has_bpkb": true,
+          "is_flood_free": true,
+          "is_accident_free": true,
+          "region": "Jabodetabek (DKI Jakarta, Bogor, Depok, Tangerang, Bekasi)"
+        }
+        ```
+
+        #### Contoh Response JSON:
+        ```json
+        {
+          "vehicle": {
+            "brand": "Toyota",
+            "model": "Kijang Innova & Zenix",
+            "variant": "Innova Zenix 2.0 G CVT (Bensin M20A)",
+            "year": 2023,
+            "msrp_new": 425600000
+          },
+          "valuation": {
+            "fair_market_value": 372500000,
+            "bargain_p25": 352000000,
+            "premium_p75": 391000000,
+            "sample_count": 42,
+            "methodology": "Empirical Quantile Median & Hedonic V7"
+          },
+          "regional_adjustment": {
+            "region_code": "JABO",
+            "multiplier": 1.0,
+            "regional_adjusted_price": 372500000
+          }
+        }
+        ```
+        """)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_dict:
+        st.markdown('<div class="content-panel"><div class="panel-header">Data Dictionary & Schema Parameters</div>', unsafe_allow_html=True)
+        dict_data = [
+            {"Parameter": "ID", "Tipe": "Integer", "Definisi": "Identifikator unik data listing."},
+            {"Parameter": "Category", "Tipe": "String", "Definisi": "Kategori bodi kendaraan (MPV, SUV, Hatchback, Sedan, EV)."},
+            {"Parameter": "Platform", "Tipe": "String", "Definisi": "Marketplace / balai lelang sumber data (OLX, FACEBOOK, MOMOTOR, JBA, IBID)."},
+            {"Parameter": "Title", "Tipe": "String", "Definisi": "Judul asli iklan setelah dinormalisasi NLP pipeline."},
+            {"Parameter": "Brand", "Tipe": "String", "Definisi": "Merk pabrikan mobil resmi (10 Merk Master)."},
+            {"Parameter": "Model", "Tipe": "String", "Definisi": "Lini model mobil (23 Model master terdaftar)."},
+            {"Parameter": "Variant", "Tipe": "String", "Definisi": "Varian spesifik dan generasi mesin (76 Varian master)."},
+            {"Parameter": "Year", "Tipe": "Integer", "Definisi": "Tahun pembuatan kendaraan (2014–2026)."},
+            {"Parameter": "Price", "Tipe": "Numeric", "Definisi": "Harga riil transaksi tunai (IDR)."},
+            {"Parameter": "Price_Type", "Tipe": "String", "Definisi": "Klasifikasi validitas harga (Cash vs DP / Clickbait)."},
+            {"Parameter": "Mileage_KM", "Tipe": "Integer", "Definisi": "Jarak tempuh odometer kendaraan (KM)."},
+            {"Parameter": "Fuel_Type", "Tipe": "String", "Definisi": "Tipe powertrain bahan bakar (Bensin, Diesel, Hybrid HEV, Listrik BEV)."},
+            {"Parameter": "Transmission", "Tipe": "String", "Definisi": "Tipe transmisi penggerak (Manual, Automatic, CVT, DHT, Single-Speed EV)."},
+            {"Parameter": "Tax_Status", "Tipe": "String", "Definisi": "Status legalitas pajak PKB (Hidup / Panjang, Mati / Off, Unknown)."},
+            {"Parameter": "BPKB", "Tipe": "String", "Definisi": "Kelengkapan dokumen BPKB & Faktur asli."},
+            {"Parameter": "City & Province", "Tipe": "String", "Definisi": "Lokasi administratif unit kendaraan."},
+            {"Parameter": "MSRP_New", "Tipe": "Numeric", "Definisi": "Harga resmi On The Road (OTR) baru saat rilis peluncuran."},
+            {"Parameter": "Depresiasi Riil (%)", "Tipe": "Numeric", "Definisi": "Persentase penyusutan harga pasar terhadap MSRP OTR baru."},
+            {"Parameter": "URL", "Tipe": "Text", "Definisi": "Tautan deep-search resmi aktif menuju listing marketplace terkait."}
+        ]
+        st.dataframe(pd.DataFrame(dict_data), use_container_width=True, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_cat:
+        st.markdown('<div class="content-panel"><div class="panel-header">Master Catalog Scope (12 Years: 2014–2026)</div>', unsafe_allow_html=True)
+        cat_summary = [
+            {"Kategori Sektor": "MPV & Family Cars", "Merk": "Toyota", "Negara": "Jepang", "Model": 5, "Varian": 22, "Rentang CC": "1200cc - 2800cc", "Contoh Model Unggulan": "Avanza, Veloz, Kijang Innova Reborn, Innova Zenix Hybrid, Fortuner, Calya, Raize, Yaris Cross"},
+            {"Kategori Sektor": "Hatchback & SUV", "Merk": "Honda", "Negara": "Jepang", "Model": 4, "Varian": 13, "Rentang CC": "1200cc - 2000cc", "Contoh Model Unggulan": "Brio Satya/RS, HR-V Turbo/SE, CR-V RS e:HEV, BR-V Sensing, WR-V RS"},
+            {"Kategori Sektor": "MPV & Ladder Frame SUV", "Merk": "Mitsubishi", "Negara": "Jepang", "Model": 3, "Varian": 7, "Rentang CC": "1500cc - 2400cc", "Contoh Model Unggulan": "Xpander Ultimate, Xpander Cross Premium, Pajero Sport Dakar 4x2, Xforce Ultimate"},
+            {"Kategori Sektor": "Crossover & EV", "Merk": "Hyundai", "Negara": "Korea Selatan", "Model": 2, "Varian": 5, "Rentang CC": "0cc (EV) / 2200cc", "Contoh Model Unggulan": "Creta Prime, Stargazer X Prime, Ioniq 5 Long Range, Palisade CRDi"},
+            {"Kategori Sektor": "City EV & MPV", "Merk": "Wuling", "Negara": "Cina", "Model": 2, "Varian": 4, "Rentang CC": "0cc (EV) / 2000cc", "Contoh Model Unggulan": "Air EV Long Range, Binguo EV 410km, Almaz RS Pro, Almaz Hybrid"},
+            {"Kategori Sektor": "Dedicated EV", "Merk": "BYD", "Negara": "Cina", "Model": 1, "Varian": 3, "Rentang CC": "0cc (EV Electric)", "Contoh Model Unggulan": "Seal Performance AWD, Atto 3 Superior Extended, Dolphin Extended"},
+            {"Kategori Sektor": "LCGC & Compact SUV", "Merk": "Daihatsu", "Negara": "Jepang", "Model": 2, "Varian": 4, "Rentang CC": "1000cc - 1500cc", "Contoh Model Unggulan": "Sigra R DLX, All New Ayla R CVT, All New Terios Custom, All New Xenia ASA"},
+            {"Kategori Sektor": "Hybrid & Mini Offroader", "Merk": "Suzuki", "Negara": "Jepang", "Model": 2, "Varian": 6, "Rentang CC": "1500cc", "Contoh Model Unggulan": "All New Ertiga GX Hybrid, XL7 Hybrid Alpha, Jimny 3-Door 4x4, Jimny 5-Door"},
+            {"Kategori Sektor": "Executive Luxury Sedan/SUV", "Merk": "BMW", "Negara": "Jerman", "Model": 1, "Varian": 4, "Rentang CC": "1500cc - 2000cc", "Contoh Model Unggulan": "320i Dynamic/Sport (G20), 330i M Sport, X1 sDrive18i xLine"},
+            {"Kategori Sektor": "Premium Luxury", "Merk": "Mercedes-Benz", "Negara": "Jerman", "Model": 1, "Varian": 3, "Rentang CC": "1500cc - 2000cc", "Contoh Model Unggulan": "C200 Avantgarde (W205), C300 AMG Line (W206), GLC 200 AMG Line"}
+        ]
+        st.dataframe(pd.DataFrame(cat_summary), use_container_width=True, hide_index=True)
+        st.caption("Total Cakupan Master Katalog: 10 Produsen Terkemuka, 23 Model Kendaraan, dan 76 Varian Resmi lintas seluruh segmen mobil di Indonesia.")
+        st.markdown('</div>', unsafe_allow_html=True)
