@@ -816,7 +816,7 @@ elif menu == "Fair Market Value (FMV) Calculator":
                 curve_data = ml_car_model_v7.generate_residual_forecast_curve(
                     current_fmv=val_res["predicted_fmv"],
                     fuel_type=sel_fuel,
-                    body_category=variant_obj.body_type,
+                    body_category=model_obj.category if model_obj else "MPV",
                     current_year=2026,
                     car_production_year=sel_year
                 )
@@ -926,8 +926,8 @@ elif menu == "Market Price Monitoring & Quartiles":
                     "Variant": var.variant_name,
                     "Year": s.year,
                     "Fuel": var.fuel_type,
-                    "Transmission": var.transmission,
-                    "Body_Type": var.body_type,
+                    "Transmission": var.transmission_type,
+                    "Body_Type": model.category,
                     "Region": s.city if s.city else "Nasional",
                     "Samples": s.sample_count,
                     "Min_Price": float(s.price_min),
