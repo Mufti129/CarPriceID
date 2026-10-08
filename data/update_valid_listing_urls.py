@@ -26,44 +26,34 @@ def extract_clean_vehicle_name(brand: str, model: str, variant: str = None) -> s
 
 def build_retail_listing_url(platform: str, brand: str, model: str, year: int = None, variant: str = None) -> str:
     clean_car = extract_clean_vehicle_name(brand, model, variant)
-    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_car.lower()).strip('-')
-    
-    query_text = clean_car
-    if year:
-        query_text += f' {year}'
-    q_encoded = urllib.parse.quote_plus(query_text)
+    query_str = f'{clean_car} {year}' if year else clean_car
+    q_encoded = urllib.parse.quote(query_str)
     
     p = (platform or '').lower()
     if 'olx' in p:
-        if year:
-            return f'https://www.olx.co.id/mobil-bekas_c198/q-{clean_slug}-{year}'
-        return f'https://www.olx.co.id/mobil-bekas_c198/q-{clean_slug}'
+        return f'https://www.olx.co.id/mobil-bekas_c198?q={q_encoded}'
     elif 'carsome' in p:
         return f'https://www.carsome.id/beli-mobil-bekas?q={q_encoded}'
     elif 'carmudi' in p:
-        b_slug = re.sub(r'[^a-zA-Z0-9]+', '-', brand.lower()).strip('-')
-        m_slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_car.replace(brand, '').strip().lower()).strip('-')
-        return f'https://www.carmudi.co.id/mobil-dijual/{b_slug}/{m_slug}'
+        return f'https://www.carmudi.co.id/mobil-dijual/indonesia?q={q_encoded}'
     elif 'mobil123' in p:
-        b_slug = re.sub(r'[^a-zA-Z0-9]+', '-', brand.lower()).strip('-')
-        m_slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_car.replace(brand, '').strip().lower()).strip('-')
-        return f'https://www.mobil123.com/mobil-dijual/{b_slug}/{m_slug}/indonesia'
+        return f'https://www.mobil123.com/mobil-dijual/indonesia?q={q_encoded}'
     elif 'facebook' in p or 'fb' in p:
         return f'https://www.facebook.com/marketplace/search/?query={q_encoded}'
     else:
-        return f'https://www.olx.co.id/mobil-bekas_c198/q-{clean_slug}'
+        return f'https://www.olx.co.id/mobil-bekas_c198?q={q_encoded}'
 
 def build_auction_lot_url(platform: str, brand: str, model: str, year: int = None, variant: str = None) -> str:
     clean_car = extract_clean_vehicle_name(brand, model, variant)
-    q_encoded = urllib.parse.quote_plus(clean_car)
+    q_plus = urllib.parse.quote_plus(clean_car)
     
     p = (platform or '').lower()
     if 'jba' in p:
-        return f'https://www.jba.co.id/id/lelang-mobil?keyword={q_encoded}'
+        return f'https://www.jba.co.id/id/lelang-mobil?keyword={q_plus}'
     elif 'ibid' in p:
-        return f'https://www.ibid.astra.co.id/cari-otomotif?keyword={q_encoded}&kategori=mobil'
+        return f'https://www.ibid.astra.co.id/cari-otomotif?keyword={q_plus}&kategori=mobil'
     else:
-        return f'https://www.jba.co.id/id/lelang-mobil?keyword={q_encoded}'
+        return f'https://www.jba.co.id/id/lelang-mobil?keyword={q_plus}'
 
 def update_all_urls():
     db: Session = SessionLocal()

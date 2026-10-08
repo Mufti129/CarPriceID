@@ -4,6 +4,7 @@ Menghasilkan 5.000+ lot lelang mobil dengan data inspeksi teknis 4-titik (ekster
 harga dasar limit, harga terbentuk ketok palu, serta catatan kondisi fisik.
 """
 
+import re
 import random
 import urllib.parse
 from datetime import datetime, timedelta
@@ -96,7 +97,18 @@ def seed_car_auction_database(target_count: int = 5000):
 
             brand_n = var.model.brand.name if (var.model and var.model.brand) else "Toyota"
             model_n = var.model.name if var.model else "Avanza"
-            q_enc = urllib.parse.quote_plus(f"{brand_n} {model_n}")
+            v_clean = re.sub(r'\(.*?\)', '', var.variant_name).strip()
+            v_clean = re.sub(r'^(All\s+New|New)\s+', '', v_clean, flags=re.IGNORECASE).strip()
+            v_tokens = v_clean.split()
+            if len(v_tokens) >= 2 and v_tokens[1].lower() in ['zenix', 'reborn', 'cross', 'satya', 'ev', 'sport', 'prime', 'signature', 'dakar', 'hybrid', 'venturer', 'urbanite']:
+                car_sub = f"{v_tokens[0]} {v_tokens[1]}"
+            elif len(v_tokens) >= 1:
+                car_sub = v_tokens[0]
+            else:
+                car_sub = model_n.split('&')[0].strip()
+            clean_car_str = f"{brand_n} {car_sub}".strip()
+            q_enc = urllib.parse.quote_plus(clean_car_str)
+
             if "jba" in platform.lower():
                 lot_url = f"https://www.jba.co.id/id/lelang-mobil?keyword={q_enc}"
             else:

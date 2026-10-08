@@ -1206,7 +1206,7 @@ elif menu == "Bargain & Arbitrage Opportunities":
                     "Market FMV": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Estimated Savings": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Discount %": st.column_config.NumberColumn(format="%.1f%%"),
-                    "Listing URL": st.column_config.LinkColumn("Listing URL", display_text="Buka Iklan ↗")
+                    "Listing URL": st.column_config.LinkColumn("Listing URL")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1583,7 +1583,7 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                     "Base_Limit_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Hammer_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
-                    "URL": st.column_config.LinkColumn("Auction Link", display_text="Buka Lot Lelang ↗")
+                    "URL": st.column_config.LinkColumn("Auction URL")
                 },
                 hide_index=True,
                 use_container_width=True
@@ -1600,25 +1600,60 @@ elif menu == "Raw Scraped Dataset Explorer":
     </div>
     """, unsafe_allow_html=True)
 
-    df_retail = load_all_listings_df()
-    if not df_retail.empty:
+    df_raw = load_all_listings_df()
+
+    if df_raw.empty:
+        st.info("Dataset mentah masih kosong.")
+    else:
+        st.markdown('<div class="content-panel"><div class="panel-header">Granular Filters & Search</div>', unsafe_allow_html=True)
+        f1, f2, f3, f4 = st.columns(4)
+        with f1:
+            search_kw = st.text_input("Search Keyword / Title", "")
+        with f2:
+            brand_filter = st.multiselect("Manufacturer Brand", options=sorted(df_raw["Brand"].unique()), default=[])
+        with f3:
+            price_type_filter = st.selectbox("Pricing Category", ["All Listings", "Cash Only", "DP / Clickbait Only"])
+        with f4:
+            tax_filter = st.multiselect("Tax Status", options=sorted(df_raw["Tax_Status"].unique()), default=[])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        filtered = df_raw.copy()
+        if search_kw:
+            filtered = filtered[filtered["Title"].str.contains(search_kw, case=False, na=False)]
+        if brand_filter:
+            filtered = filtered[filtered["Brand"].isin(brand_filter)]
+        if price_type_filter == "Cash Only":
+            filtered = filtered[filtered["Price_Type"] == "Cash"]
+        elif price_type_filter == "DP / Clickbait Only":
+            filtered = filtered[filtered["Price_Type"] == "DP / Clickbait"]
+        if tax_filter:
+            filtered = filtered[filtered["Tax_Status"].isin(tax_filter)]
+
+        col_m1, col_m2 = st.columns([3, 1])
+        with col_m1:
+            st.markdown(f"**Menampilkan {len(filtered):,} dari {len(df_raw):,} total baris data:**")
+        with col_m2:
+            csv_data = filtered.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="Export Filtered CSV",
+                data=csv_data,
+                file_name=f"carpriceid_scraped_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
         st.dataframe(
-            df_retail,
+            filtered[[
+                "ID", "Platform", "Title", "Brand", "Model", "Variant", "Year",
+                "Price", "Price_Type", "Mileage_KM", "Tax_Status", "BPKB", "City", "URL"
+            ]],
             column_config={
                 "Price": st.column_config.NumberColumn(format="Rp %,.0f"),
-                "MSRP_New": st.column_config.NumberColumn(format="Rp %,.0f"),
                 "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
-                "URL": st.column_config.LinkColumn("Listing URL", display_text="Buka Iklan ↗")
+                "URL": st.column_config.LinkColumn("Listing URL")
             },
             hide_index=True,
             use_container_width=True
-        )
-        csv = df_retail.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Unduh Dataset Lengkap (CSV)",
-            data=csv,
-            file_name=f"CarPriceID_Dataset_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
         )
 
 # ==============================================================================
