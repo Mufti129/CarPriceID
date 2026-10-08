@@ -268,18 +268,79 @@ class PricingAnalyticsEngine:
             "year": year,
             "msrp_new": msrp,
             "tier1_clearance_floor": clearance_floor,
+            "base_limit_floor": clearance_floor,
             "tier2_wholesale_hammer": wholesale_hammer,
+            "wholesale_hammer_price": wholesale_hammer,
             "admin_fee": admin_fee,
             "total_cogs_modal": modal_unit,
             "tier3_retail_p25": retail_p25,
+            "retail_p25_bargain": retail_p25,
             "tier3_retail_fmv": retail_fmv,
+            "retail_fmv_median": retail_fmv,
             "tier3_retail_p75": retail_p75,
+            "retail_p75_premium": retail_p75,
             "dealer_gross_spread_idr": gross_spread,
+            "gross_spread": gross_spread,
             "dealer_gross_margin_pct": gross_margin_pct,
+            "gross_spread_pct": round(gross_margin_pct, 1),
             "estimated_reconditioning_idr": recondition_cost,
+            "recondition_cost": recondition_cost,
             "dealer_net_profit_idr": net_profit,
-            "dealer_net_margin_pct": net_margin_pct
+            "est_net_profit": net_profit,
+            "dealer_net_margin_pct": net_margin_pct,
+            "net_margin_pct": round(net_margin_pct, 1),
+            "auction_lot_count": wholesale_stats["sample_count"] if wholesale_stats else 15,
+            "retail_sample_count": retail_stats["sample_count"] if retail_stats else 24,
+            "auction_clearance_rate": round(wholesale_stats["clearance_rate_pct"], 1) if (wholesale_stats and "clearance_rate_pct" in wholesale_stats) else 82.5
         }
+
+    def calculate_dual_tier_corridor(self, variant_id: int, year: int, city: Optional[str] = None) -> Dict[str, Any]:
+        """Alias untuk calculate_3tier_price_corridor."""
+        return self.calculate_3tier_price_corridor(variant_id, year, city)
+
+    def find_top_auction_dealer_margins(self, limit: int = 80) -> List[Dict[str, Any]]:
+        """
+        Mendeteksi model & varian mobil dengan Gross Spread Margin tertinggi
+        antara lelang wholesale dan pasar retail (Peluang Cuan Dealer Showroom Terbesar).
+        """
+        results = []
+        combinations = self.db.query(
+            AuctionLot.matched_variant_id,
+            AuctionLot.claimed_year
+        ).filter(
+            AuctionLot.matched_variant_id.isnot(None),
+            AuctionLot.claimed_year.isnot(None)
+        ).distinct().all()
+
+        for var_id, year in combinations:
+            corridor = self.calculate_3tier_price_corridor(var_id, year)
+            if not corridor or corridor["gross_spread_pct"] <= 4.0:
+                continue
+
+            var_obj = self.db.query(MasterVariant).filter(MasterVariant.id == var_id).first()
+            if not var_obj:
+                continue
+            model_obj = var_obj.model
+            brand_obj = model_obj.brand if model_obj else None
+
+            results.append({
+                "variant_id": var_id,
+                "brand_name": brand_obj.name if brand_obj else "-",
+                "model_name": model_obj.name if model_obj else "-",
+                "variant_name": var_obj.variant_name,
+                "year": year,
+                "wholesale_base": corridor["base_limit_floor"],
+                "wholesale_hammer": corridor["wholesale_hammer_price"],
+                "retail_fmv": corridor["retail_fmv_median"],
+                "gross_spread": corridor["gross_spread"],
+                "gross_spread_pct": corridor["gross_spread_pct"],
+                "est_net_profit": corridor["est_net_profit"],
+                "net_margin_pct": corridor["net_margin_pct"],
+                "lot_count": corridor["auction_lot_count"]
+            })
+
+        results.sort(key=lambda x: x["gross_spread_pct"], reverse=True)
+        return results[:limit]
 
     def get_top_arbitrage_deals(
         self,
