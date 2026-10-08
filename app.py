@@ -215,6 +215,26 @@ st.markdown("""
         background-color: #10b981;
         border-radius: 50%;
     }
+
+    /* Content Panels */
+    .content-panel {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+    .panel-header {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #f8fafc;
+        margin-bottom: 12px;
+        letter-spacing: -0.01em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -869,82 +889,208 @@ elif menu == "Fair Market Value (FMV) Calculator":
 elif menu == "Market Price Monitoring & Quartiles":
     st.markdown("""
     <div class="hero-appbar">
-        <div class="hero-title">Market Price Monitoring & 3-Tier Price Corridors</div>
-        <div class="hero-subtitle">Analisis rentang harga kuartil pasar (P25 - Median FMV - P75) dan integrasi Koridor Harga 3-Tier.</div>
+        <div class="hero-title">Market Price Monitoring & Statistical Quartiles</div>
+        <div class="hero-subtitle">Standardized pricing matrix across variant generations and manufacturing years with Min, P25 Bargain, Median FMV, P75 Premium, and Max prices.</div>
+        <div class="hero-tags">
+            <span class="hero-tag-pill">Quartile Distribution</span>
+            <span class="hero-tag-pill">Official MSRP Comparison</span>
+            <span class="hero-tag-pill">Multi-Filter Matrix</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     db = get_db_session()
     try:
-        variants = db.query(
-            MasterVariant,
-            MasterModel.name.label("model_name"),
-            MasterBrand.name.label("brand_name")
+        stats_query = db.query(
+            MarketPriceStats, MasterVariant, MasterModel, MasterBrand
+        ).join(
+            MasterVariant, MarketPriceStats.variant_id == MasterVariant.id
         ).join(
             MasterModel, MasterVariant.model_id == MasterModel.id
         ).join(
             MasterBrand, MasterModel.brand_id == MasterBrand.id
         ).all()
 
-        var_labels = [f"{v.brand_name} {v.model_name} - {v.MasterVariant.variant_name}" for v in variants]
-        sel_label = st.selectbox("Pilih Varian Mobil untuk Analisis Mendalam", var_labels, index=0)
+        if not stats_query:
+            st.info("Tabel statistik pasar sedang diproses. Silakan refresh atau jalankan pembaruan data.")
+        else:
+            table_rows = []
+            for s, var, model, brand in stats_query:
+                msrp = float(var.official_msrp_new) if var.official_msrp_new else None
+                median_p = float(s.price_median)
+                depreciation_pct = ((msrp - median_p) / msrp * 100.0) if (msrp and msrp > 0) else None
 
-        sel_v_obj = variants[var_labels.index(sel_label)]
-        var_id = sel_v_obj.MasterVariant.id
+                table_rows.append({
+                    "Brand": brand.name,
+                    "Model": model.name,
+                    "Variant": var.variant_name,
+                    "Year": s.year,
+                    "Fuel": var.fuel_type,
+                    "Transmission": var.transmission,
+                    "Body_Type": var.body_type,
+                    "Region": s.city if s.city else "Nasional",
+                    "Samples": s.sample_count,
+                    "Min_Price": float(s.price_min),
+                    "P25_Bargain": float(s.price_p25),
+                    "Median_FMV": median_p,
+                    "P75_Premium": float(s.price_p75),
+                    "Max_Price": float(s.price_max),
+                    "Official_MSRP": msrp,
+                    "Depreciation_Pct": depreciation_pct
+                })
+            df_stats = pd.DataFrame(table_rows)
 
-        engine = PricingAnalyticsEngine(db)
+            # Top KPI Summary Cards
+            k1, k2, k3, k4 = st.columns(4)
+            with k1:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Matrix Matrix Entries</div>
+                    <div class="kpi-value">{len(df_stats):,}</div>
+                    <div class="kpi-subtext">Varian & tahun termonitor</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k2:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Median FMV</div>
+                    <div class="kpi-value" style="color: #38bdf8; font-size: 1.30rem;">Rp {df_stats['Median_FMV'].mean():,.0f}</div>
+                    <div class="kpi-subtext">Rata-rata harga pasar wajar</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k3:
+                avg_deprec = df_stats['Depreciation_Pct'].dropna().mean()
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Real Depreciation</div>
+                    <div class="kpi-value" style="color: #34d399;">{avg_deprec:.1f}%</div>
+                    <div class="kpi-subtext">Penyusutan dari MSRP baru</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k4:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">Analyzed Listing Volume</div>
+                    <div class="kpi-value">{df_stats['Samples'].sum():,}</div>
+                    <div class="kpi-subtext">Total unit data sebaran</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-        col_y, col_info = st.columns([1, 3])
-        with col_y:
-            sel_year_mon = st.selectbox("Pilih Tahun Produksi", list(range(sel_v_obj.MasterVariant.release_year_start, (sel_v_obj.MasterVariant.release_year_end or 2026) + 1)), index=0)
+            # Filter Parameters Panel
+            st.markdown('<div class="content-panel"><div class="panel-header">Filter Parameters</div>', unsafe_allow_html=True)
+            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+            with f_col1:
+                all_brands = sorted(df_stats["Brand"].unique())
+                sel_brands = st.multiselect("Manufacturer Brand", options=all_brands, default=all_brands)
+            with f_col2:
+                avail_models = sorted(df_stats[df_stats["Brand"].isin(sel_brands)]["Model"].unique()) if sel_brands else sorted(df_stats["Model"].unique())
+                sel_models = st.multiselect("Model Series", options=avail_models, default=[])
+            with f_col3:
+                avail_years = sorted(df_stats["Year"].unique(), reverse=True)
+                sel_years = st.multiselect("Production Year", options=avail_years, default=[])
+            with f_col4:
+                all_fuels = sorted(df_stats["Fuel"].dropna().unique())
+                sel_fuels = st.multiselect("Powertrain / Fuel", options=all_fuels, default=[])
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        corridor = engine.calculate_3tier_price_corridor(var_id, sel_year_mon)
+            filtered_df = df_stats[df_stats["Brand"].isin(sel_brands)]
+            if sel_models:
+                filtered_df = filtered_df[filtered_df["Model"].isin(sel_models)]
+            if sel_years:
+                filtered_df = filtered_df[filtered_df["Year"].isin(sel_years)]
+            if sel_fuels:
+                filtered_df = filtered_df[filtered_df["Fuel"].isin(sel_fuels)]
 
-        st.markdown("### 3-Tier Price Corridor Architecture")
-        t1, t2, t3 = st.columns(3)
-        with t1:
-            st.markdown(f"""
-            <div class="kpi-card" style="border-left: 3px solid #94a3b8;">
-                <div class="kpi-label">Tier 1: Clearance Floor Limit</div>
-                <div class="kpi-value" style="font-size: 1.40rem;">Rp {corridor['tier1_clearance_floor']:,.0f}</div>
-                <div class="kpi-subtext">Harga pembukaan lelang</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with t2:
-            st.markdown(f"""
-            <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-                <div class="kpi-label">Tier 2: Wholesale Hammer Price</div>
-                <div class="kpi-value" style="font-size: 1.40rem; color: #38bdf8;">Rp {corridor['tier2_wholesale_hammer']:,.0f}</div>
-                <div class="kpi-subtext">Modal lelang + fee (Rp {corridor['total_cogs_modal']:,.0f})</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with t3:
-            st.markdown(f"""
-            <div class="kpi-card" style="border-left: 3px solid #34d399;">
-                <div class="kpi-label">Tier 3: Retail Fair Market Value</div>
-                <div class="kpi-value" style="font-size: 1.40rem; color: #34d399;">Rp {corridor['tier3_retail_fmv']:,.0f}</div>
-                <div class="kpi-subtext">P25: Rp {corridor['tier3_retail_p25']:,.0f} | P75: Rp {corridor['tier3_retail_p75']:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Detail Matrix Table
+            st.dataframe(
+                filtered_df.sort_values(by=["Brand", "Model", "Year"], ascending=[True, True, False]),
+                use_container_width=True,
+                column_config={
+                    "Min_Price": st.column_config.NumberColumn(label="Min Price", format="Rp %,.0f"),
+                    "P25_Bargain": st.column_config.NumberColumn(label="P25 Bargain", format="Rp %,.0f"),
+                    "Median_FMV": st.column_config.NumberColumn(label="Median FMV", format="Rp %,.0f"),
+                    "P75_Premium": st.column_config.NumberColumn(label="P75 Premium", format="Rp %,.0f"),
+                    "Max_Price": st.column_config.NumberColumn(label="Max Price", format="Rp %,.0f"),
+                    "Official_MSRP": st.column_config.NumberColumn(label="Official MSRP", format="Rp %,.0f"),
+                    "Depreciation_Pct": st.column_config.NumberColumn(label="Depresiasi Riil (%)", format="%.1f%%"),
+                    "Samples": st.column_config.NumberColumn(label="Samples", format="%d units")
+                },
+                hide_index=True
+            )
 
-        st.markdown("### Estimasi Margin Profit Showroom Dealer")
-        m1, m2 = st.columns(2)
-        with m1:
-            st.metric("Gross Profit Spread", f"Rp {corridor['dealer_gross_spread_idr']:,.0f}", f"{corridor['dealer_gross_margin_pct']:.1f}% Gross Margin")
-        with m2:
-            st.metric("Net Profit (Setelah Rekondisi Rp 4jt)", f"Rp {corridor['dealer_net_profit_idr']:,.0f}", f"{corridor['dealer_net_margin_pct']:.1f}% Net Margin")
+            # Deep-Dive Section: 3-Tier Price Corridors & Boxplot
+            st.markdown("---")
+            st.markdown("### Deep-Dive Unit Analysis & 3-Tier Price Corridor")
+            st.caption("Eksplorasi koridor harga lelang grosir (Tier 1 & Tier 2) vs harga jual retail showroom (Tier 3) beserta potensi margin keuntungan.")
 
-        # Boxplot listings aktual
-        df_retail = load_all_listings_df()
-        if not df_retail.empty:
-            sub_df = df_retail[(df_retail["Variant"] == sel_v_obj.MasterVariant.variant_name) & (df_retail["Price_Type"] == "Cash")]
-            if not sub_df.empty:
-                st.markdown("#### Distribusi Sebaran Listing Pasar Aktual (Tukey IQR Boxplot)")
-                fig_box = px.box(
-                    sub_df, x="Year", y="Price", color="Year",
-                    points="all", hover_data=["Title", "City", "Mileage_KM"]
-                )
-                st.plotly_chart(format_dark_chart(fig_box, is_price_axis=True, x_title="Tahun", y_title="Harga Cash (IDR)"), use_container_width=True)
+            variants_list = db.query(
+                MasterVariant,
+                MasterModel.name.label("model_name"),
+                MasterBrand.name.label("brand_name")
+            ).join(
+                MasterModel, MasterVariant.model_id == MasterModel.id
+            ).join(
+                MasterBrand, MasterModel.brand_id == MasterBrand.id
+            ).all()
+
+            var_labels = [f"{v.brand_name} {v.model_name} - {v.MasterVariant.variant_name}" for v in variants_list]
+            col_sel1, col_sel2 = st.columns([3, 1])
+            with col_sel1:
+                sel_label = st.selectbox("Pilih Varian Kendaraan", var_labels, index=0)
+            
+            sel_v_obj = variants_list[var_labels.index(sel_label)]
+            var_id = sel_v_obj.MasterVariant.id
+            
+            with col_sel2:
+                year_range = list(range(sel_v_obj.MasterVariant.release_year_start, (sel_v_obj.MasterVariant.release_year_end or 2026) + 1))
+                sel_year_mon = st.selectbox("Pilih Tahun Produksi", year_range, index=len(year_range)-1)
+
+            engine = PricingAnalyticsEngine(db)
+            corridor = engine.calculate_3tier_price_corridor(var_id, sel_year_mon)
+
+            t1, t2, t3 = st.columns(3)
+            with t1:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #94a3b8;">
+                    <div class="kpi-label">Tier 1: Clearance Floor Limit</div>
+                    <div class="kpi-value" style="font-size: 1.35rem;">Rp {corridor['tier1_clearance_floor']:,.0f}</div>
+                    <div class="kpi-subtext">Harga pembukaan lelang balai grosir</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with t2:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+                    <div class="kpi-label">Tier 2: Wholesale Hammer Price</div>
+                    <div class="kpi-value" style="font-size: 1.35rem; color: #38bdf8;">Rp {corridor['tier2_wholesale_hammer']:,.0f}</div>
+                    <div class="kpi-subtext">Modal lelang + fee (Rp {corridor['total_cogs_modal']:,.0f})</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with t3:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #34d399;">
+                    <div class="kpi-label">Tier 3: Retail Fair Market Value</div>
+                    <div class="kpi-value" style="font-size: 1.35rem; color: #34d399;">Rp {corridor['tier3_retail_fmv']:,.0f}</div>
+                    <div class="kpi-subtext">P25: Rp {corridor['tier3_retail_p25']:,.0f} | P75: Rp {corridor['tier3_retail_p75']:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric("Gross Profit Spread", f"Rp {corridor['dealer_gross_spread_idr']:,.0f}", f"{corridor['dealer_gross_margin_pct']:.1f}% Gross Margin")
+            with m2:
+                st.metric("Net Profit (Setelah Rekondisi Rp 4jt)", f"Rp {corridor['dealer_net_profit_idr']:,.0f}", f"{corridor['dealer_net_margin_pct']:.1f}% Net Margin")
+
+            # Boxplot listings aktual
+            df_retail = load_all_listings_df()
+            if not df_retail.empty:
+                sub_df = df_retail[(df_retail["Variant"] == sel_v_obj.MasterVariant.variant_name) & (df_retail["Price_Type"] == "Cash")]
+                if not sub_df.empty:
+                    st.markdown("#### Distribusi Sebaran Listing Pasar Aktual (Tukey IQR Boxplot)")
+                    fig_box = px.box(
+                        sub_df, x="Year", y="Price", color="Year",
+                        points="all", hover_data=["Title", "City", "Mileage_KM"]
+                    )
+                    st.plotly_chart(format_dark_chart(fig_box, is_price_axis=True, x_title="Tahun", y_title="Harga Cash (IDR)"), use_container_width=True)
 
     finally:
         db.close()
