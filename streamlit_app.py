@@ -1233,10 +1233,11 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
     </div>
     """, unsafe_allow_html=True)
 
-    tab_corridor, tab_radar, tab_lots = st.tabs([
+    tab_corridor, tab_radar, tab_lots, tab_ibid_map = st.tabs([
         "3-Tier Price Corridor & Valuation",
         "Dealer Gross Spread & Profitability Radar",
-        "Auction Lot Explorer & Inspection Grades"
+        "Auction Lot Explorer & Inspection Grades",
+        "Car Market Valuation (IBID Astra MAP)"
     ])
 
     # --------------------------------------------------------------------------
@@ -1611,6 +1612,138 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                     "Hammer_Price": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Mileage_KM": st.column_config.NumberColumn(format="%,.0f KM"),
                     "URL": st.column_config.LinkColumn("Auction URL", display_text="Link Post")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+
+    # --------------------------------------------------------------------------
+    # TAB 4: CAR MARKET VALUATION (IBID ASTRA MAP)
+    # --------------------------------------------------------------------------
+    with tab_ibid_map:
+        st.markdown("### Official Car Market Valuation (IBID Astra MAP)")
+        st.caption("Eksplorasi data benchmark valuasi lelang wholesale dan grade inspeksi teknis ACV (Astra Car Valuation) resmi dari PT Balai Lelang Serasi (Astra Group).")
+
+        db_map = get_db_session()
+        try:
+            records = db_map.query(IbidMapValuation).order_by(IbidMapValuation.brand, IbidMapValuation.series, IbidMapValuation.year.desc()).all()
+        finally:
+            db_map.close()
+
+        if not records:
+            st.info("Belum ada data valuasi IBID MAP di database lokal. Silakan jalankan Auto-Sync di menu 'Live Scraper & Crawler Center'.")
+        else:
+            map_data = []
+            for r in records:
+                map_data.append({
+                    "Merek": r.brand,
+                    "Seri": r.series,
+                    "Tipe": r.type,
+                    "Silinder": r.cylinder or "-",
+                    "Tahun": r.year,
+                    "Transmisi": r.transmission,
+                    "Min Limit (Rp)": float(r.min_price) if r.min_price else None,
+                    "Max Limit (Rp)": float(r.max_price) if r.max_price else None,
+                    "Grade A (Rp)": float(r.grade_a_price) if r.grade_a_price else None,
+                    "Grade B (Rp)": float(r.grade_b_price) if r.grade_b_price else None,
+                    "Grade C (Rp)": float(r.grade_c_price) if r.grade_c_price else None,
+                    "Grade D (Rp)": float(r.grade_d_price) if r.grade_d_price else None,
+                    "Lokasi Acuan": r.location or "JAKARTA",
+                    "Terakhir Disinkron": r.last_synced_at.strftime("%Y-%m-%d %H:%M") if r.last_synced_at else "-",
+                    "Portal Resmi": "https://map.ibid.astra.co.id/"
+                })
+            df_map = pd.DataFrame(map_data)
+
+            # Filter Panel
+            st.markdown('<div class="content-panel"><div class="panel-header">Filter Pencarian Data IBID MAP</div>', unsafe_allow_html=True)
+            col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+            with col_f1:
+                sel_brands = st.multiselect("Pilih Merek", options=sorted(df_map["Merek"].unique()), default=[])
+            with col_f2:
+                search_series = st.text_input("Cari Seri / Model (contoh: Avanza, Brio, Ayla)", value="")
+            with col_f3:
+                sel_trans = st.selectbox("Transmisi", ["Semua Transmisi", "MT (Manual)", "AT (Automatic)"])
+            with col_f4:
+                sel_years = st.multiselect("Tahun", options=sorted(df_map["Tahun"].unique(), reverse=True), default=[])
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            filtered_map = df_map.copy()
+            if sel_brands:
+                filtered_map = filtered_map[filtered_map["Merek"].isin(sel_brands)]
+            if search_series:
+                filtered_map = filtered_map[filtered_map["Seri"].str.contains(search_series, case=False, na=False) | filtered_map["Tipe"].str.contains(search_series, case=False, na=False)]
+            if sel_trans == "MT (Manual)":
+                filtered_map = filtered_map[filtered_map["Transmisi"] == "MT"]
+            elif sel_trans == "AT (Automatic)":
+                filtered_map = filtered_map[filtered_map["Transmisi"] == "AT"]
+            if sel_years:
+                filtered_map = filtered_map[filtered_map["Tahun"].isin(sel_years)]
+
+            # KPI Summary
+            total_items = len(filtered_map)
+            avg_min = filtered_map["Min Limit (Rp)"].dropna().mean() if not filtered_map["Min Limit (Rp)"].dropna().empty else 0
+            avg_gra = filtered_map["Grade A (Rp)"].dropna().mean() if not filtered_map["Grade A (Rp)"].dropna().empty else 0
+            avg_grb = filtered_map["Grade B (Rp)"].dropna().mean() if not filtered_map["Grade B (Rp)"].dropna().empty else 0
+
+            k1, k2, k3, k4 = st.columns(4)
+            with k1:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #3b82f6;">
+                    <div class="kpi-label">TOTAL DATA TERFILTER</div>
+                    <div class="kpi-value" style="color: #38bdf8; font-size: 1.30rem;">{total_items:,} Varian</div>
+                    <div class="kpi-subtext">Dari {len(df_map):,} Data di DB</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k2:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #64748b;">
+                    <div class="kpi-label">RATA-RATA MIN LIMIT</div>
+                    <div class="kpi-value" style="color: #cbd5e1; font-size: 1.30rem;">Rp {avg_min:,.0f}</div>
+                    <div class="kpi-subtext">Harga Batas Bawah Lelang</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k3:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #10b981;">
+                    <div class="kpi-label">RATA-RATA GRADE A</div>
+                    <div class="kpi-value" style="color: #34d399; font-size: 1.30rem;">Rp {avg_gra:,.0f}</div>
+                    <div class="kpi-subtext">Kondisi Prima / Sangat Baik</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with k4:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
+                    <div class="kpi-label">RATA-RATA GRADE B</div>
+                    <div class="kpi-value" style="color: #fbbf24; font-size: 1.30rem;">Rp {avg_grb:,.0f}</div>
+                    <div class="kpi-subtext">Kondisi Standar / Wajar</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Export & Table
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_d1, col_d2 = st.columns([3, 1])
+            with col_d1:
+                st.markdown(f"**Menampilkan {len(filtered_map):,} varian mobil hasil valuasi IBID Astra MAP:**")
+            with col_d2:
+                csv_map_data = filtered_map.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="Export CSV IBID MAP",
+                    data=csv_map_data,
+                    file_name=f"ibid_map_car_valuations_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
+            st.dataframe(
+                filtered_map,
+                column_config={
+                    "Min Limit (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Max Limit (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade A (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade B (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade C (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade D (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Portal Resmi": st.column_config.LinkColumn("Portal MAP", display_text="Buka MAP ↗")
                 },
                 hide_index=True,
                 use_container_width=True
