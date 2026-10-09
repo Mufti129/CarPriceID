@@ -12,11 +12,12 @@ from sqlalchemy import func
 from models.database import SessionLocal, init_db
 from models.catalog import (
     MasterBrand, MasterModel, MasterVariant, ScrapedListing, MarketPriceStats,
-    AuctionLot, WholesalePriceStats
+    AuctionLot, WholesalePriceStats, IbidMapValuation
 )
 from data.seed_master_cars import seed_master_car_database
 from data.seed_car_auctions import seed_car_auction_database
 from data.generate_car_market import generate_massive_car_dataset
+from data.sync_ibid_map_data import sync_ibid_map_data
 from scrapers.olx_car_scraper import OLXCarScraper
 from scrapers.car_auction_scraper import CarAuctionScraper
 from pipeline.normalizer import ListingNormalizer
@@ -1687,6 +1688,101 @@ elif menu == "Live Scraper & Crawler Center":
                 st.success(f"Berhasil mengambil {len(lots)} lot lelang aktif.")
                 st.json(lots[:2])
 
+    st.markdown("---")
+    st.markdown("""
+    <div class="content-panel">
+        <div class="panel-header" style="color: #60a5fa;">IBID Astra MAP (Market Auction Price) — Auto-Sync Wholesale Engine</div>
+        <div class="info-callout" style="border-left-color: #3b82f6; margin-bottom: 16px;">
+            <div class="info-callout-title" style="color: #93c5fd;">Wholesale Auction Intelligence Resmi Astra Group</div>
+            <div class="info-callout-desc">
+                Sinkronisasi otomatis harga likuidasi grosir lelang dan inspeksi 4-titik (ACV Grade A/B/C/D) langsung dari portal resmi <b>map.ibid.astra.co.id</b> ke database lokal <code>mobil_bekas.db</code>.
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    db_ibid = get_db_session()
+    try:
+        ibid_count = db_ibid.query(IbidMapValuation).count()
+        ibid_brands = [b[0] for b in db_ibid.query(IbidMapValuation.brand).distinct().all()]
+        latest_ibid = db_ibid.query(IbidMapValuation).order_by(IbidMapValuation.last_synced_at.desc()).first()
+    finally:
+        db_ibid.close()
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Total Data Tersinkron di DB", f"{ibid_count:,} Varian")
+    with m2:
+        st.metric("Merek Tersinkron", f"{len(ibid_brands)} Merek")
+    with m3:
+        st.metric("Sinkronisasi Terakhir", latest_ibid.last_synced_at.strftime("%d %b %Y, %H:%M") if (latest_ibid and latest_ibid.last_synced_at) else "Belum Ada")
+
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("Jalankan Auto-Sync Merek Utama (Toyota, Daihatsu, Honda, Suzuki, Mitsubishi)", use_container_width=True):
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+            def update_ui(msg, pct):
+                status_text.info(msg)
+                progress_bar.progress(pct)
+            with st.spinner("Menghubungkan ke API IBID Astra MAP..."):
+                sync_res = sync_ibid_map_data(
+                    target_brand_names=["TOYOTA", "DAIHATSU", "HONDA", "SUZUKI", "MITSUBISHI", "HYUNDAI", "WULING"],
+                    delay_sec=0.08,
+                    progress_callback=update_ui
+                )
+                st.success(f"Berhasil menyinkronkan {sync_res['records_upserted']} varian harga lelang IBID MAP ke mobil_bekas.db!")
+                st.rerun()
+
+    with col_btn2:
+        if st.button("Jalankan Auto-Sync Seluruh 26 Merek (Full Harvest)", use_container_width=True):
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+            def update_ui_full(msg, pct):
+                status_text.info(msg)
+                progress_bar.progress(pct)
+            with st.spinner("Harvesting seluruh merek IBID Astra MAP..."):
+                sync_res = sync_ibid_map_data(
+                    limit_brands=26,
+                    delay_sec=0.08,
+                    progress_callback=update_ui_full
+                )
+                st.success(f"Full Sync Selesai! {sync_res['records_upserted']} varian tersimpan.")
+                st.rerun()
+
+    db_prev = get_db_session()
+    try:
+        recent_ibid = db_prev.query(IbidMapValuation).order_by(IbidMapValuation.last_synced_at.desc()).limit(10).all()
+        if recent_ibid:
+            st.markdown("##### Preview Data Valuasi IBID MAP Terbaru di Database Lokal:")
+            df_ibid_prev = pd.DataFrame([{
+                "Merek": r.brand,
+                "Seri": r.series,
+                "Tipe": r.type,
+                "Tahun": r.year,
+                "Transmisi": r.transmission,
+                "Min Harga (Rp)": float(r.min_price) if r.min_price else None,
+                "Max Harga (Rp)": float(r.max_price) if r.max_price else None,
+                "Grade A (Rp)": float(r.grade_a_price) if r.grade_a_price else None,
+                "Grade B (Rp)": float(r.grade_b_price) if r.grade_b_price else None,
+                "Grade C (Rp)": float(r.grade_c_price) if r.grade_c_price else None,
+                "Terakhir Disinkron": r.last_synced_at.strftime("%Y-%m-%d %H:%M") if r.last_synced_at else "-"
+            } for r in recent_ibid])
+            st.dataframe(
+                df_ibid_prev,
+                column_config={
+                    "Min Harga (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Max Harga (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade A (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade B (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                    "Grade C (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+    finally:
+        db_prev.close()
+
 # ==============================================================================
 # 8. OFFICIAL MASTER CATALOG (12 YEARS)
 # ==============================================================================
@@ -2013,6 +2109,8 @@ elif menu == "System Documentation & Methodology":
         - **`GET /api/v1/catalog/models?brand_id={id}`** : Mengambil daftar model, CC mesin, dan kategori bodi.
         - **`POST /api/v1/valuation/calculate`** : Menghitung FMV wajar, rentang P25/P75, dan residual forecast.
         - **`GET /api/v1/wholesale/corridor/{variant_id}/{year}`** : Mengambil data 3-tier wholesale auction corridor.
+        - **`GET /api/v1/wholesale/ibid-map/valuations`** : Mengambil data resmi valuasi & grade inspeksi IBID Astra MAP.
+        - **`GET /api/v1/wholesale/ibid-map/summary`** : Ringkasan statistik database sinkronisasi IBID Astra MAP.
         - **`GET /api/v1/arbitrage/deals?min_discount=12`** : Mengambil daftar listing hot deals diskon arbitrase.
 
         #### Contoh Payload Request Valuasi (`POST /api/v1/valuation/calculate`):

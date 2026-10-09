@@ -82,5 +82,20 @@ class TestCarPriceAPI(unittest.TestCase):
         regions = res.json()
         self.assertEqual(len(regions), 8)
 
+    def test_ibid_map_summary(self):
+        res = self.client.get("/api/v1/wholesale/ibid-map/summary")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "OPERATIONAL")
+        self.assertIn("total_records", data)
+        self.assertIn("synced_brands", data)
+
+    def test_ibid_map_valuations(self):
+        res = self.client.get("/api/v1/wholesale/ibid-map/valuations?limit=10")
+        self.assertEqual(res.status_code, 200)
+        items = res.json()
+        self.assertIsInstance(items, list)
+
 if __name__ == "__main__":
     unittest.main()
+

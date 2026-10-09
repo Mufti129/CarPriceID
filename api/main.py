@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db, init_db
 from models.catalog import (
     MasterBrand, MasterModel, MasterVariant, ScrapedListing, 
-    MarketPriceStats, AuctionLot, WholesalePriceStats
+    MarketPriceStats, AuctionLot, WholesalePriceStats, IbidMapValuation
 )
 from analytics.ml_car_valuation import ml_car_model_v7
 from analytics.pricing_engine import PricingAnalyticsEngine
@@ -267,3 +267,58 @@ def get_regions():
             "provinces": r_info["provinces"]
         })
     return res
+
+# ==============================================================================
+# 7. IBID ASTRA MAP WHOLESALE BENCHMARK ENDPOINTS
+# ==============================================================================
+@app.get("/api/v1/wholesale/ibid-map/valuations", tags=["Wholesale & Auctions"])
+def get_ibid_map_valuations(
+    brand: Optional[str] = Query(None, description="Filter nama merek (contoh: TOYOTA, DAIHATSU)"),
+    series: Optional[str] = Query(None, description="Filter seri mobil (contoh: AVANZA, AYLA)"),
+    year: Optional[int] = Query(None, description="Filter tahun pembuatan"),
+    limit: int = Query(50, ge=1, le=200, description="Maksimum jumlah hasil"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(IbidMapValuation)
+    if brand:
+        query = query.filter(IbidMapValuation.brand.ilike(f"%{brand}%"))
+    if series:
+        query = query.filter(IbidMapValuation.series.ilike(f"%{series}%"))
+    if year:
+        query = query.filter(IbidMapValuation.year == year)
+
+    records = query.order_by(IbidMapValuation.brand, IbidMapValuation.series, IbidMapValuation.year.desc()).limit(limit).all()
+    return [{
+        "id": r.id,
+        "brand": r.brand,
+        "series": r.series,
+        "cylinder": r.cylinder,
+        "type": r.type,
+        "year": r.year,
+        "transmission": r.transmission,
+        "location": r.location,
+        "min_price": float(r.min_price) if r.min_price else None,
+        "max_price": float(r.max_price) if r.max_price else None,
+        "grade_a_price": float(r.grade_a_price) if r.grade_a_price else None,
+        "grade_b_price": float(r.grade_b_price) if r.grade_b_price else None,
+        "grade_c_price": float(r.grade_c_price) if r.grade_c_price else None,
+        "grade_d_price": float(r.grade_d_price) if r.grade_d_price else None,
+        "matched_variant_id": r.matched_variant_id,
+        "last_synced_at": r.last_synced_at.isoformat() if r.last_synced_at else None
+    } for r in records]
+
+@app.get("/api/v1/wholesale/ibid-map/summary", tags=["Wholesale & Auctions"])
+def get_ibid_map_summary(db: Session = Depends(get_db)):
+    total_count = db.query(IbidMapValuation).count()
+    brands = [b[0] for b in db.query(IbidMapValuation.brand).distinct().all()]
+    latest = db.query(IbidMapValuation).order_by(IbidMapValuation.last_synced_at.desc()).first()
+    return {
+        "source": "IBID Astra MAP (Market Auction Price)",
+        "portal_url": "https://map.ibid.astra.co.id/",
+        "total_records": total_count,
+        "synced_brands": sorted(brands),
+        "synced_brands_count": len(brands),
+        "latest_sync_timestamp": latest.last_synced_at.isoformat() if (latest and latest.last_synced_at) else None,
+        "status": "OPERATIONAL"
+    }
+

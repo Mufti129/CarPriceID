@@ -209,3 +209,37 @@ class MarketPriceStats(Base):
     __table_args__ = (
         UniqueConstraint("stat_date", "variant_id", "year", "city", name="uq_stat_date_var_year_city_car"),
     )
+
+
+class IbidMapValuation(Base):
+    """
+    Data Resmi Hasil Valuasi & Benchmark Lelang IBID Astra MAP (Market Auction Price).
+    Mencakup harga batas bawah/atas serta rincian per Grade Inspeksi ACV (Grade A-D).
+    """
+    __tablename__ = "ibid_map_valuations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    brand = Column(String(50), nullable=False, index=True)
+    series = Column(String(50), nullable=False, index=True)
+    cylinder = Column(String(20), nullable=True)
+    type = Column(String(50), nullable=False, index=True)
+    year = Column(Integer, nullable=False, index=True)
+    transmission = Column(String(20), nullable=False, default="MT")
+    location = Column(String(100), nullable=True)
+
+    min_price = Column(Numeric(15, 2), nullable=True)
+    max_price = Column(Numeric(15, 2), nullable=True)
+    grade_a_price = Column(Numeric(15, 2), nullable=True)
+    grade_b_price = Column(Numeric(15, 2), nullable=True)
+    grade_c_price = Column(Numeric(15, 2), nullable=True)
+    grade_d_price = Column(Numeric(15, 2), nullable=True)
+
+    matched_variant_id = Column(Integer, ForeignKey("master_variants.id"), nullable=True, index=True)
+    last_synced_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("brand", "series", "type", "year", "transmission", name="uq_ibid_map_car_variant"),
+    )
+
+    matched_variant = relationship("MasterVariant")
+
