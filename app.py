@@ -1341,7 +1341,33 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                         </div>
                         """, unsafe_allow_html=True)
 
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    # Benchmark Resmi IBID Astra MAP (jika tersedia di DB)
+                    ibid_benchmark = db.query(IbidMapValuation).filter(
+                        IbidMapValuation.matched_variant_id == var_obj.id,
+                        IbidMapValuation.year == selected_year
+                    ).first()
+                    if not ibid_benchmark:
+                        ibid_benchmark = db.query(IbidMapValuation).filter(
+                            IbidMapValuation.brand.ilike(f"%{selected_brand_name}%"),
+                            IbidMapValuation.year == selected_year
+                        ).first()
+
+                    if ibid_benchmark:
+                        min_p_str = f"Rp {float(ibid_benchmark.min_price):,.0f}" if ibid_benchmark.min_price else "-"
+                        gr_a_str = f"Rp {float(ibid_benchmark.grade_a_price):,.0f}" if ibid_benchmark.grade_a_price else "-"
+                        gr_b_str = f"Rp {float(ibid_benchmark.grade_b_price):,.0f}" if ibid_benchmark.grade_b_price else "-"
+                        st.markdown(f"""
+                        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px; padding: 10px 14px; margin-top: 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <div style="font-size: 0.82rem; color: #93c5fd;">
+                                🏢 <b>Official Benchmark IBID Astra MAP:</b> {ibid_benchmark.brand} {ibid_benchmark.series} {ibid_benchmark.type} ({ibid_benchmark.year} {ibid_benchmark.transmission})
+                            </div>
+                            <div style="font-size: 0.80rem; color: #cbd5e1;">
+                                Min Limit: <strong style="color: #38bdf8;">{min_p_str}</strong> &nbsp;|&nbsp; Grade A: <strong style="color: #34d399;">{gr_a_str}</strong> &nbsp;|&nbsp; Grade B: <strong style="color: #fbbf24;">{gr_b_str}</strong>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("<br>", unsafe_allow_html=True)
 
                     # Visual Waterfall / Bar Comparison Chart
                     chart_col1, chart_col2 = st.columns([3, 2])
