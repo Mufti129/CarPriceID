@@ -114,6 +114,95 @@ class TestCarPriceAPI(unittest.TestCase):
         self.assertEqual(parsed["high"], 148500000.0)
         self.assertEqual(parsed["mid"], 145600000.0)
 
+    def test_credit_simulation_endpoint(self):
+        payload = {
+            "otr_price": 300000000.0,
+            "dp_pct": 25.0,
+            "tenor_years": 4,
+            "interest_rate_flat_pct": 9.35,
+            "insurance_type": "Kombinasi (Thn 1 All-Risk + TLO)",
+            "ojk_region": "Wilayah 2 (DKI Jakarta, Jawa Barat, Banten)",
+            "payment_scheme": "ADDM (Angsuran Dibayar di Muka)"
+        }
+        res = self.client.post("/api/v1/valuation/credit-simulation", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["otr_price"], 300000000.0)
+        self.assertEqual(data["pure_dp"], 75000000.0)
+        self.assertEqual(data["principal_loan"], 225000000.0)
+        self.assertGreater(data["monthly_installment"], 0)
+        self.assertGreater(data["total_tdp"], data["pure_dp"])
+        self.assertEqual(len(data["multi_tenor_comparison"]), 5)
+
+    def test_reconditioning_estimate_endpoint(self):
+        payload = {
+            "base_fmv": 250000000.0,
+            "selected_defect_keys": ["baret_bumper", "penyok_pintu_fender", "ac_kurang_dingin"]
+        }
+        res = self.client.post("/api/v1/valuation/reconditioning-estimate", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["base_fmv"], 250000000.0)
+        self.assertGreater(data["total_reconditioning_cost_idr"], 0)
+        self.assertIn(data["overall_grade"], ["A", "B", "C", "D", "E"])
+        self.assertLess(data["net_fmv_after_reconditioning"], 250000000.0)
+        self.assertEqual(len(data["selected_defects"]), 3)
+
+    def test_enterprise_auth_status_endpoint(self):
+        res = self.client.get("/api/v1/enterprise/auth-status")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("authenticated", data)
+        self.assertIn("tier", data)
+        self.assertIn("rate_limit_per_minute", data)
+
+    def test_system_jobs_endpoint(self):
+        res = self.client.get("/api/v1/system/jobs?limit=5")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("jobs", data)
+        self.assertIsInstance(data["jobs"], list)
+
+    def test_credit_simulator_logic(self):
+        from analytics.credit_simulator import simulate_car_credit
+        sim = simulate_car_credit(
+            otr_price=200000000.0,
+            dp_pct=20.0,
+            tenor_years=3,
+            payment_scheme="ADDB (Angsuran Dibayar di Belakang)"
+        )
+        self.assertEqual(sim["pure_dp"], 40000000.0)
+        self.assertEqual(sim["principal_loan"], 160000000.0)
+        self.assertEqual(len(sim["multi_tenor_comparison"]), 5)
+        self.assertGreater(sim["total_tdp"], 40000000.0)
+
+    def test_damage_vision_and_acv_scoring(self):
+        from analytics.damage_vision import calculate_reconditioning_and_acv_grade
+        eval_res = calculate_reconditioning_and_acv_grade(
+            base_fmv=350000000.0,
+            selected_defect_keys=["baret_bumper", "mika_lampu_kusam"]
+        )
+        self.assertEqual(eval_res["total_reconditioning_cost_idr"], 1400000.0)
+        self.assertEqual(eval_res["overall_grade"], "A")
+        self.assertEqual(eval_res["net_fmv_after_reconditioning"], 350000000.0 - 1400000.0)
+
+    def test_scheduler_log_recording(self):
+        from pipeline.scheduler import record_sync_job, get_recent_job_logs
+        log_entry = record_sync_job(
+            job_name="Automated Unit Test Job",
+            trigger_source="PYTEST_RUNNER",
+            status="SUCCESS",
+            records_processed=99,
+            duration_seconds=0.15,
+            notes="Scheduler unit test verification"
+        )
+        self.assertEqual(log_entry["status"], "SUCCESS")
+        self.assertEqual(log_entry["records_processed"], 99)
+
+        recent = get_recent_job_logs(limit=5)
+        self.assertGreater(len(recent), 0)
+        self.assertEqual(recent[0]["trigger_source"], "PYTEST_RUNNER")
+
     def test_olx_scraper_feed_valid_urls(self):
         from scrapers.olx_car_scraper import OLXCarScraper
         scraper = OLXCarScraper()

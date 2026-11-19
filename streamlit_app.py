@@ -9,10 +9,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models.database import SessionLocal, init_db
+from models.database import SessionLocal, init_db, get_db_engine_info
 from models.catalog import (
     MasterBrand, MasterModel, MasterVariant, ScrapedListing, MarketPriceStats,
-    AuctionLot, WholesalePriceStats, IbidMapValuation
+    AuctionLot, WholesalePriceStats, IbidMapValuation, SyncJobLog
 )
 from data.seed_master_cars import seed_master_car_database
 from data.seed_car_auctions import seed_car_auction_database
@@ -23,11 +23,14 @@ from scrapers.car_auction_scraper import CarAuctionScraper
 from pipeline.normalizer import ListingNormalizer
 from pipeline.scam_detector import ScamAndDPDetector
 from pipeline.entity_matcher import EntityMatcher
+from pipeline.scheduler import run_scheduled_sync_cycle, get_recent_job_logs, record_sync_job
 from analytics.pricing_engine import PricingAnalyticsEngine
 from analytics.regional_index import REGIONAL_PRICE_INDEX, get_all_regions, apply_regional_pricing, get_region_multiplier
 from analytics.ml_car_valuation import ml_car_model_v7
 from analytics.certificate_generator import generate_car_pdf_certificate
 from analytics.alert_dispatcher import alert_dispatcher
+from analytics.credit_simulator import simulate_car_credit
+from analytics.damage_vision import calculate_reconditioning_and_acv_grade, DEFECT_CATALOG
 
 # ==============================================================================
 # PAGE CONFIGURATION
@@ -602,10 +605,10 @@ with st.sidebar:
     st.markdown("""
     <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
         <div style="color: #38bdf8; font-size: 0.76rem; font-weight: 700; text-transform: uppercase;">Catalog Scope</div>
-        <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 3px; line-height: 1.35;">10 Brands | 23 Models | 76 Variants | 15,200+ Retail | 5,000 Lots (2014–2026)</div>
+        <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 3px; line-height: 1.35;">15 Brands | 30 Models | 91 Variants | 15,200+ Retail | 5,000 Lots | 537 IBID MAP (2014–2026)</div>
     </div>
     """, unsafe_allow_html=True)
-    st.caption("Engine: Python 3.13 | ML: V7 Hedonic Residual | DB: SQLite ORM")
+    st.caption("Engine: Python 3.13 | ML: V7 Hedonic Residual | DB: High-Concurrency WAL / PG Pool")
 
 # ==============================================================================
 # 1. MARKET OVERVIEW
@@ -837,12 +840,14 @@ elif menu == "Fair Market Value (FMV) Calculator":
             }
 
             # ==================================================================
-            # 3 DEDICATED SUB-TABS (HEDONIC/REGIONAL, RESIDUAL FORECAST, PDF CERT)
+            # 5 DEDICATED SUB-TABS (HEDONIC, RESIDUAL, CREDIT, DEFECT, PDF CERT)
             # ==================================================================
-            fmv_tab1, fmv_tab2, fmv_tab3 = st.tabs([
+            fmv_tab1, fmv_tab2, fmv_tab3, fmv_tab4, fmv_tab5 = st.tabs([
                 "1. Rincian Penyesuaian Hedonik & Regional",
                 "2. Proyeksi Depresiasi Masa Depan (Model Versi 7)",
-                "3. Unduh Sertifikat Valuasi Resmi (PDF)"
+                "3. Simulasi Pembiayaan Kredit & Leasing (OJK)",
+                "4. Estimasi Inspeksi & Rekondisi Kerusakan (AI Vision)",
+                "5. Unduh Sertifikat Valuasi Resmi (PDF)"
             ])
 
             # ---------------- TAB 1: HEDONIC & REGIONAL BREAKDOWN -------------
@@ -974,8 +979,287 @@ elif menu == "Fair Market Value (FMV) Calculator":
                     hide_index=True
                 )
 
-            # ---------------- TAB 3: OFFICIAL PDF CERTIFICATE -----------------
+            # ---------------- TAB 3: OJK MULTIFINANCE CREDIT SIMULATOR --------
             with fmv_tab3:
+                st.markdown("#### Simulasi Pembiayaan Kredit & Leasing Mobil Bekas (Standar OJK & APPI)")
+                st.caption("Perhitungan terperinci skema pembiayaan multifinance (ACC, Mandiri Utama Finance, BCA Finance, Adira Finance) dengan tarif asuransi Surat Edaran OJK (SEOJK) dan bunga flat per tenor.")
+
+                c_in1, c_in2, c_in3 = st.columns(3)
+                with c_in1:
+                    sim_dp_pct = st.slider("Uang Muka / Down Payment (%)", min_value=10.0, max_value=70.0, value=25.0, step=5.0)
+                    sim_tenor = st.selectbox("Jangka Waktu / Tenor Pembiayaan", [1, 2, 3, 4, 5], index=3, format_func=lambda x: f"{x} Tahun ({x*12} Bulan)")
+                with c_in2:
+                    sim_scheme = st.radio("Skema Angsuran", ["ADDM (Angsuran Dibayar di Muka)", "ADDB (Angsuran Dibayar di Belakang)"], index=0)
+                    sim_ins_type = st.selectbox("Jenis Perlindungan Asuransi", [
+                        "Kombinasi (Thn 1 All-Risk + TLO)",
+                        "Full All-Risk Komprehensif",
+                        "Total Loss Only (TLO)"
+                    ], index=0)
+                with c_in3:
+                    sim_ojk_region = st.selectbox("Wilayah Asuransi OJK", [
+                        "Wilayah 2 (DKI Jakarta, Jawa Barat, Banten)",
+                        "Wilayah 1 (Sumatera & Kepulauan)",
+                        "Wilayah 3 (Jawa Tengah, Jatim, Bali, Kalimantan, Sulawesi)"
+                    ], index=0)
+                    default_flat_rate = {1: 7.75, 2: 8.25, 3: 8.75, 4: 9.35, 5: 9.95}.get(sim_tenor, 9.35)
+                    sim_rate = st.number_input("Suku Bunga Flat Tahunan (% p.a.)", min_value=3.0, max_value=20.0, value=default_flat_rate, step=0.25)
+
+                # Jalankan kalkulasi kredit
+                credit_res = simulate_car_credit(
+                    otr_price=fmv_display,
+                    dp_pct=sim_dp_pct,
+                    tenor_years=sim_tenor,
+                    interest_rate_flat_pct=sim_rate,
+                    insurance_type=sim_ins_type,
+                    ojk_region=sim_ojk_region,
+                    payment_scheme=sim_scheme
+                )
+
+                # KPI Row
+                ck1, ck2, ck3, ck4 = st.columns(4)
+                with ck1:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: #38bdf8;">
+                        <div class="kpi-label">Angsuran per Bulan</div>
+                        <div class="kpi-value" style="font-size: 1.35rem; color: #38bdf8;">Rp {credit_res['monthly_installment']:,.0f}</div>
+                        <div class="kpi-subtext">Tenor {credit_res['tenor_months']} Bulan ({sim_scheme.split(' ')[0]})</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with ck2:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: #f59e0b;">
+                        <div class="kpi-label">Total DP Pertama (TDP)</div>
+                        <div class="kpi-value" style="font-size: 1.35rem; color: #fbbf24;">Rp {credit_res['total_tdp']:,.0f}</div>
+                        <div class="kpi-subtext">DP Murni + Admin + Asuransi + Provisi</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with ck3:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Pokok Pembiayaan Bersih</div>
+                        <div class="kpi-value" style="font-size: 1.35rem;">Rp {credit_res['principal_loan']:,.0f}</div>
+                        <div class="kpi-subtext">OTR - Uang Muka Murni (DP {credit_res['dp_pct']}%)</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with ck4:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: #34d399;">
+                        <div class="kpi-label">Syarat Gaji Minimal (DSR 30%)</div>
+                        <div class="kpi-value" style="font-size: 1.35rem; color: #34d399;">Rp {credit_res['min_recommended_income_idr']:,.0f}</div>
+                        <div class="kpi-subtext">Batas aman debt service ratio</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f"""
+                <div class="info-callout" style="border-left-color: #38bdf8; margin-top: 15px;">
+                    <div class="info-callout-title" style="color: #7dd3fc;">Rincian Komponen Pembayaran Pertama (Total Down Payment / TDP)</div>
+                    <div class="info-callout-desc">
+                        • <strong>Uang Muka Murni ({credit_res['dp_pct']}%):</strong> Rp {credit_res['pure_dp']:,.0f}<br>
+                        • <strong>Premi Asuransi ({credit_res['insurance_type']} - {credit_res['ojk_region'].split(' (')[0]}):</strong> Rp {credit_res['insurance_premium']:,.0f}<br>
+                        • <strong>Biaya Administrasi & Fidusia Multifinance:</strong> Rp {credit_res['admin_fidusia_fee']:,.0f}<br>
+                        • <strong>Biaya Provisi Kredit (1% Pokok Hutang):</strong> Rp {credit_res['provision_fee']:,.0f}<br>
+                        • <strong>Angsuran Bulan Pertama (Skema ADDM):</strong> {'Rp ' + f"{credit_res['monthly_installment']:,.0f}" if 'ADDM' in sim_scheme else 'Rp 0 (Termasuk di Angsuran Bulan Berikutnya - ADDB)'}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Tabel Komparasi Seluruh Tenor 1-5 Tahun
+                st.markdown("#### Matriks Komparasi Angsuran & TDP Berdasarkan Tenor (1 s/d 5 Tahun)")
+                df_multi_tenor = pd.DataFrame(credit_res["multi_tenor_comparison"])
+                df_multi_display = df_multi_tenor.rename(columns={
+                    "tenor_years": "Tenor (Thn)",
+                    "tenor_months": "Bulan",
+                    "flat_interest_pct": "Bunga Flat (% p.a.)",
+                    "monthly_installment": "Angsuran / Bulan (IDR)",
+                    "total_tdp": "Total Pembayaran Pertama / TDP (IDR)",
+                    "insurance_premium": "Total Premi Asuransi (IDR)",
+                    "min_monthly_income_dsr30": "Min. Penghasilan Bulanan (IDR)"
+                })
+
+                fig_tenor = go.Figure()
+                fig_tenor.add_trace(go.Bar(
+                    x=[f"{r['tenor_years']} Tahun ({r['tenor_months']} Bln)" for r in credit_res["multi_tenor_comparison"]],
+                    y=[r['monthly_installment'] for r in credit_res["multi_tenor_comparison"]],
+                    name="Angsuran per Bulan (IDR)",
+                    marker_color="#38bdf8",
+                    text=[f"Rp {r['monthly_installment']/1e6:.1f}M" for r in credit_res["multi_tenor_comparison"]],
+                    textposition="auto"
+                ))
+                st.plotly_chart(format_dark_chart(fig_tenor, show_legend=False, x_title="Tenor Kredit", y_title="Angsuran per Bulan (IDR)", is_price_axis=True), use_container_width=True)
+
+                st.dataframe(
+                    df_multi_display.style.format({
+                        "Bunga Flat (% p.a.)": "{:.2f}%",
+                        "Angsuran / Bulan (IDR)": "Rp {:,.0f}",
+                        "Total Pembayaran Pertama / TDP (IDR)": "Rp {:,.0f}",
+                        "Total Premi Asuransi (IDR)": "Rp {:,.0f}",
+                        "Min. Penghasilan Bulanan (IDR)": "Rp {:,.0f}"
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+            # ---------------- TAB 4: AI DEFECT INSPECTION & RECONDITIONING ----
+            with fmv_tab4:
+                st.markdown("#### Estimasi Inspeksi 4-Titik ACV & Biaya Rekondisi Kerusakan (AI Vision)")
+                st.caption("Pemeriksaan fisik komprehensif 4 pilar (Eksterior, Interior, Mesin, Rangka Sasis) mengacu pada standar taksasi lelang ACV dan estimasi biaya perbaikan bengkel di Indonesia.")
+
+                col_v1, col_v2 = st.columns([1, 1])
+                img_bytes = None
+                with col_v1:
+                    st.markdown("##### 1. Unggah Citra Fisik Kendaraan (Opsional)")
+                    uploaded_file = st.file_uploader("Upload Foto Kendaraan / Panel Bodi (JPG/PNG)", type=["jpg", "jpeg", "png"], key="car_photo_uploader")
+
+                    if uploaded_file:
+                        img_bytes = uploaded_file.read()
+                        st.image(uploaded_file, caption="Pratinjau Citra Inspeksi Kendaraan", use_container_width=True)
+                        cv_metrics = analyze_vehicle_image_bytes(img_bytes)
+                        st.markdown(f"""
+                        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-top: 8px;">
+                            <div style="color: #38bdf8; font-weight: 700; font-size: 0.82rem; margin-bottom: 6px;">AI Computer Vision Feature Analysis</div>
+                            <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.45;">
+                                • Resolusi Citra: <strong>{cv_metrics.get('resolution', 'N/A')}</strong><br>
+                                • Skor Kehalusan Permukaan Bodi: <strong>{cv_metrics.get('surface_smoothness_score', 85.0)}/100</strong><br>
+                                • Keseragaman Lapisan Cat (Paint Uniformity): <strong>{cv_metrics.get('paint_uniformity_score', 85.0)}/100</strong><br>
+                                • Indeks Anomali Tepi (Edge Roughness): <strong>{cv_metrics.get('edge_anomaly_index', 0.15)}</strong>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("Pilih checklist cacat fisik & mekanis di samping kanan secara manual, atau unggah foto untuk analisis otomatis.")
+
+                with col_v2:
+                    st.markdown("##### 2. Checklist Cacat Fisik & Mekanis Bengkel")
+                    st.caption("Pilih kondisi atau kerusakan yang ditemukan pada unit:")
+
+                    selected_defect_keys = []
+                    
+                    st.markdown("**Eksterior & Bodi:**")
+                    if st.checkbox("Baret / Lecet Bumper Depan/Belakang (Rp 850rb)", key="def_baret"):
+                        selected_defect_keys.append("baret_bumper")
+                    if st.checkbox("Penyok Pintu / Fender Samping (Rp 1.45jt)", key="def_penyok"):
+                        selected_defect_keys.append("penyok_pintu_fender")
+                    if st.checkbox("Cat Kusam / Belang Kap Mesin/Atap (Rp 1.8jt)", key="def_belang"):
+                        selected_defect_keys.append("cat_belang_kap")
+                    if st.checkbox("Kaca Depan Retak / Baret Wiper (Rp 2.2jt)", key="def_kaca"):
+                        selected_defect_keys.append("kaca_depan_retak")
+                    if st.checkbox("Mika Headlamp Menguning / Buram (Rp 550rb)", key="def_mika"):
+                        selected_defect_keys.append("mika_lampu_kusam")
+
+                    st.markdown("**Interior & Kabin:**")
+                    if st.checkbox("Interior Kotor / Jok Retak (Rp 1.35jt)", key="def_interior"):
+                        selected_defect_keys.append("interior_kotor_jok")
+                    if st.checkbox("AC Kurang Dingin / Bau Apek (Rp 950rb)", key="def_ac"):
+                        selected_defect_keys.append("ac_kurang_dingin")
+
+                    st.markdown("**Mesin & Kaki-Kaki:**")
+                    if st.checkbox("Rembes Oli Mesin / Seal Kruk As (Rp 1.25jt)", key="def_rembes"):
+                        selected_defect_keys.append("rembes_oli_mesin")
+                    if st.checkbox("Kaki-Kaki Bunyi / Limbung (Rp 2.1jt)", key="def_kaki"):
+                        selected_defect_keys.append("kaki_kaki_bunyi")
+                    if st.checkbox("Ban Aus di Bawah 40% (2 Pcs) (Rp 1.9jt)", key="def_ban"):
+                        selected_defect_keys.append("ban_aus_2pcs")
+                    if st.checkbox("Perlu Servis Besar Fluida Rutin (Rp 1.75jt)", key="def_servis"):
+                        selected_defect_keys.append("servis_besar_fluida")
+
+                    st.markdown("**Integritas Struktur & Rangka Sasis:**")
+                    if st.checkbox("Bekas Tabrak Apron / Rangka Depan (Rp 6.5jt)", key="def_apron"):
+                        selected_defect_keys.append("bekas_tabrak_apron")
+                    if st.checkbox("Indikasi Bekas Banjir / Karat Kolong (Rp 9.5jt)", key="def_banjir"):
+                        selected_defect_keys.append("indikasi_banjir")
+
+                # Jalankan Rekondisi Engine
+                recond_res = calculate_reconditioning_and_acv_grade(
+                    base_fmv=fmv_display,
+                    selected_defect_keys=selected_defect_keys,
+                    image_bytes=img_bytes
+                )
+
+                grade_color_map = {
+                    "A": "#34d399",
+                    "B": "#38bdf8",
+                    "C": "#fbbf24",
+                    "D": "#f87171",
+                    "E": "#ef4444"
+                }
+                g_col = grade_color_map.get(recond_res["overall_grade"], "#94a3b8")
+
+                st.markdown("---")
+                st.markdown("##### Hasil Penilaian Inspeksi 4-Titik & Estimasi Biaya Rekondisi:")
+
+                vk1, vk2, vk3, vk4 = st.columns(4)
+                with vk1:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: {g_col};">
+                        <div class="kpi-label">Skor ACV & Grade Kondisi</div>
+                        <div class="kpi-value" style="color: {g_col}; font-size: 1.5rem;">Grade {recond_res['overall_grade']} ({recond_res['overall_score']:.1f}/100)</div>
+                        <div class="kpi-subtext">Standar inspeksi lelang ACV</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with vk2:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: #f87171;">
+                        <div class="kpi-label">Total Biaya Rekondisi</div>
+                        <div class="kpi-value" style="color: #f87171; font-size: 1.35rem;">Rp {recond_res['total_reconditioning_cost_idr']:,.0f}</div>
+                        <div class="kpi-subtext">{len(recond_res['selected_defects'])} item kerusakan teridentifikasi</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with vk3:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">Estimasi Waktu Bengkel</div>
+                        <div class="kpi-value" style="font-size: 1.35rem;">{recond_res['total_workshop_days']} Hari Kerja</div>
+                        <div class="kpi-subtext">Durasi pengerjaan perbaikan</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with vk4:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="border-color: #38bdf8;">
+                        <div class="kpi-label">Net FMV Setelah Rekondisi</div>
+                        <div class="kpi-value" style="color: #38bdf8; font-size: 1.35rem;">Rp {recond_res['net_fmv_after_reconditioning']:,.0f}</div>
+                        <div class="kpi-subtext">Nilai wajar bersih setelah dikurangi perbaikan</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f"""
+                <div class="info-callout" style="border-left-color: {g_col}; margin-top: 12px;">
+                    <div class="info-callout-title" style="color: {g_col};">Rekomendasi Keputusan Pembelian:</div>
+                    <div class="info-callout-desc" style="font-size: 0.88rem;">
+                        <strong>{recond_res['action_recommendation']}</strong>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                cat_scores = recond_res["category_scores"]
+                p_c1, p_c2, p_c3, p_c4 = st.columns(4)
+                with p_c1:
+                    st.metric("1. Eksterior & Bodi", f"{cat_scores['Exterior']['score']}/100", f"Grade {cat_scores['Exterior']['grade']}")
+                with p_c2:
+                    st.metric("2. Interior & Kabin", f"{cat_scores['Interior']['score']}/100", f"Grade {cat_scores['Interior']['grade']}")
+                with p_c3:
+                    st.metric("3. Mesin & Penggerak", f"{cat_scores['Engine']['score']}/100", f"Grade {cat_scores['Engine']['grade']}")
+                with p_c4:
+                    st.metric("4. Rangka Sasis", f"{cat_scores['Frame']['score']}/100", f"Grade {cat_scores['Frame']['grade']}")
+
+                if recond_res["selected_defects"]:
+                    st.markdown("##### Rincian Biaya Kerusakan Per Item:")
+                    df_defects = pd.DataFrame(recond_res["selected_defects"]).rename(columns={
+                        "defect_key": "Kode Defek",
+                        "name": "Deskripsi Pekerjaan Rekondisi Bengkel",
+                        "category": "Kategori",
+                        "cost_idr": "Biaya Estimasi (IDR)",
+                        "est_days": "Waktu (Hari)"
+                    })
+                    st.dataframe(
+                        df_defects[["Kategori", "Deskripsi Pekerjaan Rekondisi Bengkel", "Biaya Estimasi (IDR)", "Waktu (Hari)"]].style.format({
+                            "Biaya Estimasi (IDR)": "Rp {:,.0f}"
+                        }),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+            # ---------------- TAB 5: OFFICIAL PDF CERTIFICATE -----------------
+            with fmv_tab5:
                 st.markdown("#### Official Automotive Valuation Certificate (PDF)")
                 st.caption("Unduh dokumen sertifikat resmi appraisal dengan nomor registrasi unik, verifikasi integritas, dan rincian parameter kondisi kendaraan untuk keperluan taksasi bank/leasing, jual-beli perorangan, atau showroom.")
 
@@ -1986,6 +2270,71 @@ elif menu == "Live Scraper & Crawler Center":
     finally:
         db_prev.close()
 
+    st.markdown("---")
+    st.markdown("""
+    <div class="content-panel">
+        <div class="panel-header" style="color: #38bdf8;">Automated Sync Scheduler & Audit Logs Daemon</div>
+        <div class="info-callout" style="border-left-color: #0284c7; margin-bottom: 16px;">
+            <div class="info-callout-title" style="color: #38bdf8;">Enterprise Background Job Orchestration & Audit Trail</div>
+            <div class="info-callout-desc">
+                Monitoring eksekusi berkala penarikan harga lelang IBID Astra MAP, kalkulasi ulang kuantil pasar ritel (P25, Median, P75), koridor wholesale, dan verifikasi integritas database konkurensi WAL mode.
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    db_info = get_db_engine_info()
+    st_col1, st_col2, st_col3 = st.columns(3)
+    with st_col1:
+        st.metric("Database Dialect", db_info.get("dialect", "sqlite").upper())
+    with st_col2:
+        st.metric("Storage Engine Mode", db_info.get("journal_mode", "WAL").upper() if "sqlite" in db_info.get("dialect", "") else "PG-Pool")
+    with st_col3:
+        st.metric("Connection Resiliency", "Active (Zero-Lock)" if db_info.get("journal_mode") == "wal" else "Connected")
+
+    btn_sync_c1, btn_sync_c2 = st.columns(2)
+    with btn_sync_c1:
+        if st.button("Jalankan 1 Siklus Lengkap (Sync IBID MAP + Refresh Kuartil Pasar)", use_container_width=True):
+            with st.spinner("Menjalankan siklus sinkronisasi latar belakang..."):
+                cycle_res = run_scheduled_sync_cycle(
+                    trigger_source="STREAMLIT_UI_MANUAL",
+                    target_brands=["TOYOTA", "HONDA", "MITSUBISHI", "DAIHATSU", "SUZUKI"],
+                    delay_sec=0.04
+                )
+                st.success(f"Siklus selesai dalam {cycle_res['duration_seconds']} detik! Total record diproses: {cycle_res['records_processed']}.")
+                st.rerun()
+
+    with btn_sync_c2:
+        if st.button("Refresh Cepat Kuartil & Koridor Pasar Saja (Tanpa Fetch API)", use_container_width=True):
+            with st.spinner("Mengalkulasi ulang kuantil pasar dari database lokal..."):
+                refresh_res = run_scheduled_sync_cycle(
+                    trigger_source="STREAMLIT_UI_REFRESH_ONLY",
+                    refresh_only=True
+                )
+                st.success(f"Kuartil pasar berhasil diperbarui dalam {refresh_res['duration_seconds']} detik ({refresh_res['records_processed']} grup)!")
+                st.rerun()
+
+    st.markdown("##### Riwayat Eksekusi Scheduler Terakhir (Audit Trail `sync_job_logs`):")
+    recent_jobs = get_recent_job_logs(limit=10)
+    if recent_jobs:
+        df_jobs = pd.DataFrame(recent_jobs).rename(columns={
+            "id": "Job ID",
+            "job_name": "Nama Pekerjaan / Siklus",
+            "trigger_source": "Pemicu",
+            "status": "Status",
+            "records_processed": "Record Diproses",
+            "duration_seconds": "Durasi (Detik)",
+            "started_at": "Waktu Mulai",
+            "notes": "Catatan Eksekusi"
+        })
+        st.dataframe(
+            df_jobs[["Job ID", "Nama Pekerjaan / Siklus", "Pemicu", "Status", "Record Diproses", "Durasi (Detik)", "Waktu Mulai", "Catatan Eksekusi"]],
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.caption("Belum ada catatan audit job di tabel sync_job_logs.")
+
 # ==============================================================================
 # 8. OFFICIAL MASTER CATALOG (12 YEARS)
 # ==============================================================================
@@ -2308,13 +2657,17 @@ elif menu == "System Documentation & Methodology":
         st.markdown("""
         #### Daftar Endpoint Resmi (Base URL: `http://localhost:8000` / `https://api.carprice.id`):
         - **`GET /api/v1/health`** : Health check dan status model version.
-        - **`GET /api/v1/catalog/brands`** : Mengambil 10 merk terdaftar di master database.
+        - **`GET /api/v1/catalog/brands`** : Mengambil 15 merk terdaftar di master database.
         - **`GET /api/v1/catalog/models?brand_id={id}`** : Mengambil daftar model, CC mesin, dan kategori bodi.
         - **`POST /api/v1/valuation/calculate`** : Menghitung FMV wajar, rentang P25/P75, dan residual forecast.
+        - **`POST /api/v1/valuation/credit-simulation`** : Simulasi angsuran kredit multifinance (TDP, bunga flat, premi asuransi SEOJK, multi-tenor 1–5 tahun).
+        - **`POST /api/v1/valuation/reconditioning-estimate`** : Estimasi inspeksi 4-titik ACV & biaya rekondisi kerusakan bengkel fisik/mekanis.
         - **`GET /api/v1/wholesale/corridor/{variant_id}/{year}`** : Mengambil data 3-tier wholesale auction corridor.
         - **`GET /api/v1/wholesale/ibid-map/valuations`** : Mengambil data resmi valuasi & grade inspeksi IBID Astra MAP.
         - **`GET /api/v1/wholesale/ibid-map/summary`** : Ringkasan statistik database sinkronisasi IBID Astra MAP.
         - **`GET /api/v1/arbitrage/deals?min_discount=12`** : Mengambil daftar listing hot deals diskon arbitrase.
+        - **`GET /api/v1/enterprise/auth-status`** : Verifikasi validitas API Key, tier access, dan rate limit headers.
+        - **`GET /api/v1/system/jobs`** : Riwayat audit trail eksekusi scheduler sinkronisasi latar belakang (`sync_job_logs`).
 
         #### Contoh Payload Request Valuasi (`POST /api/v1/valuation/calculate`):
         ```json
@@ -2366,9 +2719,9 @@ elif menu == "System Documentation & Methodology":
             {"Parameter": "Category", "Tipe": "String", "Definisi": "Kategori bodi kendaraan (MPV, SUV, Hatchback, Sedan, EV)."},
             {"Parameter": "Platform", "Tipe": "String", "Definisi": "Marketplace / balai lelang sumber data (OLX, FACEBOOK, MOMOTOR, JBA, IBID)."},
             {"Parameter": "Title", "Tipe": "String", "Definisi": "Judul asli iklan setelah dinormalisasi NLP pipeline."},
-            {"Parameter": "Brand", "Tipe": "String", "Definisi": "Merk pabrikan mobil resmi (10 Merk Master)."},
-            {"Parameter": "Model", "Tipe": "String", "Definisi": "Lini model mobil (23 Model master terdaftar)."},
-            {"Parameter": "Variant", "Tipe": "String", "Definisi": "Varian spesifik dan generasi mesin (76 Varian master)."},
+            {"Parameter": "Brand", "Tipe": "String", "Definisi": "Merk pabrikan mobil resmi (15 Merk Master)."},
+            {"Parameter": "Model", "Tipe": "String", "Definisi": "Lini model mobil (30 Model master terdaftar)."},
+            {"Parameter": "Variant", "Tipe": "String", "Definisi": "Varian spesifik dan generasi mesin (91 Varian master)."},
             {"Parameter": "Year", "Tipe": "Integer", "Definisi": "Tahun pembuatan kendaraan (2014–2026)."},
             {"Parameter": "Price", "Tipe": "Numeric", "Definisi": "Harga riil transaksi tunai (IDR)."},
             {"Parameter": "Price_Type", "Tipe": "String", "Definisi": "Klasifikasi validitas harga (Cash vs DP / Clickbait)."},
@@ -2397,8 +2750,13 @@ elif menu == "System Documentation & Methodology":
             {"Kategori Sektor": "LCGC & Compact SUV", "Merk": "Daihatsu", "Negara": "Jepang", "Model": 2, "Varian": 4, "Rentang CC": "1000cc - 1500cc", "Contoh Model Unggulan": "Sigra R DLX, All New Ayla R CVT, All New Terios Custom, All New Xenia ASA"},
             {"Kategori Sektor": "Hybrid & Mini Offroader", "Merk": "Suzuki", "Negara": "Jepang", "Model": 2, "Varian": 6, "Rentang CC": "1500cc", "Contoh Model Unggulan": "All New Ertiga GX Hybrid, XL7 Hybrid Alpha, Jimny 3-Door 4x4, Jimny 5-Door"},
             {"Kategori Sektor": "Executive Luxury Sedan/SUV", "Merk": "BMW", "Negara": "Jerman", "Model": 1, "Varian": 4, "Rentang CC": "1500cc - 2000cc", "Contoh Model Unggulan": "320i Dynamic/Sport (G20), 330i M Sport, X1 sDrive18i xLine"},
-            {"Kategori Sektor": "Premium Luxury", "Merk": "Mercedes-Benz", "Negara": "Jerman", "Model": 1, "Varian": 3, "Rentang CC": "1500cc - 2000cc", "Contoh Model Unggulan": "C200 Avantgarde (W205), C300 AMG Line (W206), GLC 200 AMG Line"}
+            {"Kategori Sektor": "Premium Luxury", "Merk": "Mercedes-Benz", "Negara": "Jerman", "Model": 1, "Varian": 3, "Rentang CC": "1500cc - 2000cc", "Contoh Model Unggulan": "C200 Avantgarde (W205), C300 AMG Line (W206), GLC 200 AMG Line"},
+            {"Kategori Sektor": "Family MPV & Crossover", "Merk": "Nissan", "Negara": "Jepang", "Model": 2, "Varian": 4, "Rentang CC": "1200cc - 1500cc", "Contoh Model Unggulan": "Grand Livina 1.5 XV, Serena Highway Star C27, Kicks e-Power"},
+            {"Kategori Sektor": "Premium Crossover & Hatch", "Merk": "Mazda", "Negara": "Jepang", "Model": 2, "Varian": 4, "Rentang CC": "1500cc - 2500cc", "Contoh Model Unggulan": "CX-5 Elite / Kuro Edition, CX-3 Pro, Mazda 3 Hatchback"},
+            {"Kategori Sektor": "Diesel Commercial & SUV", "Merk": "Isuzu", "Negara": "Jepang", "Model": 1, "Varian": 2, "Rentang CC": "1900cc - 2500cc", "Contoh Model Unggulan": "Panther Grand Touring Turbo, Mu-X 1.9 4x2"},
+            {"Kategori Sektor": "Modern Turbo Crossover", "Merk": "Chery", "Negara": "Cina", "Model": 1, "Varian": 3, "Rentang CC": "1500cc - 1600cc", "Contoh Model Unggulan": "Omoda 5 RZ Turbo, Tiggo 7 Pro, Tiggo 8 Pro"},
+            {"Kategori Sektor": "Compact SUV & MPV", "Merk": "Kia", "Negara": "Korea Selatan", "Model": 1, "Varian": 2, "Rentang CC": "1400cc - 1500cc", "Contoh Model Unggulan": "Seltos EXP Turbo, Sonet Premiere"}
         ]
         st.dataframe(pd.DataFrame(cat_summary), use_container_width=True, hide_index=True)
-        st.caption("Total Cakupan Master Katalog: 10 Produsen Terkemuka, 23 Model Kendaraan, dan 76 Varian Resmi lintas seluruh segmen mobil di Indonesia.")
+        st.caption("Total Cakupan Master Katalog: 15 Produsen Terkemuka, 30 Model Kendaraan, dan 91 Varian Resmi lintas seluruh segmen mobil di Indonesia.")
         st.markdown('</div>', unsafe_allow_html=True)

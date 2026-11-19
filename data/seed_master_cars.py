@@ -377,6 +377,114 @@ MASTER_CAR_CATALOG = [
                 ]
             }
         ]
+    },
+    {
+        "brand": "Nissan",
+        "country": "Jepang",
+        "models": [
+            {
+                "name": "Grand Livina & All New Livina",
+                "category": "MPV",
+                "cc": 1499,
+                "fuel": "Bensin",
+                "seats": 7,
+                "variants": [
+                    {"name": "Grand Livina 1.5 XV CVT (L11)", "start": 2014, "end": 2018, "msrp": 245000000, "trans": "CVT", "fuel": "Bensin", "cc": 1498, "aliases": "grand livina xv,livina l11,nissan grand livina"},
+                    {"name": "All New Livina 1.5 VL AT (ND1W)", "start": 2019, "end": 2026, "msrp": 312000000, "trans": "Automatic", "fuel": "Bensin", "cc": 1499, "aliases": "all new livina vl,livina vl,nissan livina 2019"}
+                ]
+            },
+            {
+                "name": "Serena & Kicks e-POWER",
+                "category": "MPV",
+                "cc": 1997,
+                "fuel": "Bensin",
+                "seats": 7,
+                "variants": [
+                    {"name": "Serena 2.0 Highway Star (C27)", "start": 2019, "end": 2026, "msrp": 545000000, "trans": "CVT", "fuel": "Bensin", "cc": 1997, "aliases": "serena c27,serena hws,nissan serena"},
+                    {"name": "Kicks e-POWER 1.2 VL (Hybrid)", "start": 2020, "end": 2026, "msrp": 519000000, "trans": "Automatic", "fuel": "Hybrid", "cc": 1198, "aliases": "kicks epower,nissan kicks,kicks hybrid"}
+                ]
+            }
+        ]
+    },
+    {
+        "brand": "Mazda",
+        "country": "Jepang",
+        "models": [
+            {
+                "name": "CX-5 & CX-3",
+                "category": "SUV",
+                "cc": 2488,
+                "fuel": "Bensin",
+                "seats": 5,
+                "variants": [
+                    {"name": "CX-5 2.5 Elite / Kuro Edition (KF)", "start": 2018, "end": 2026, "msrp": 628800000, "trans": "Automatic", "fuel": "Bensin", "cc": 2488, "aliases": "mazda cx5 elite,cx-5 kuro,cx5 gt"},
+                    {"name": "CX-3 1.5 Sport Skyactiv-G", "start": 2020, "end": 2026, "msrp": 399900000, "trans": "Automatic", "fuel": "Bensin", "cc": 1496, "aliases": "mazda cx3,cx-3 1.5 sport"}
+                ]
+            },
+            {
+                "name": "Mazda2 & Mazda3 Hatchback",
+                "category": "Hatchback",
+                "cc": 1496,
+                "fuel": "Bensin",
+                "seats": 5,
+                "variants": [
+                    {"name": "Mazda2 1.5 GT AT Skyactiv", "start": 2015, "end": 2026, "msrp": 367700000, "trans": "Automatic", "fuel": "Bensin", "cc": 1496, "aliases": "mazda 2 gt,mazda2 skyactiv"},
+                    {"name": "All New Mazda3 2.0 Hatchback", "start": 2019, "end": 2026, "msrp": 565500000, "trans": "Automatic", "fuel": "Bensin", "cc": 1998, "aliases": "mazda 3 hatchback,all new mazda3"}
+                ]
+            }
+        ]
+    },
+    {
+        "brand": "Isuzu",
+        "country": "Jepang",
+        "models": [
+            {
+                "name": "Panther & Mu-X",
+                "category": "SUV",
+                "cc": 2499,
+                "fuel": "Diesel",
+                "seats": 7,
+                "variants": [
+                    {"name": "Panther 2.5 Grand Touring Turbo MT", "start": 2014, "end": 2021, "msrp": 342000000, "trans": "Manual", "fuel": "Diesel", "cc": 2499, "aliases": "panther grand touring,panther gt,isuzu panther"},
+                    {"name": "All New Mu-X 1.9 4x4 AT Diesel", "start": 2021, "end": 2026, "msrp": 599000000, "trans": "Automatic", "fuel": "Diesel", "cc": 1898, "aliases": "isuzu mux,mu-x diesel"}
+                ]
+            }
+        ]
+    },
+    {
+        "brand": "Chery",
+        "country": "Tiongkok",
+        "models": [
+            {
+                "name": "Omoda 5 & Tiggo 8 Pro",
+                "category": "SUV",
+                "cc": 1498,
+                "fuel": "Bensin",
+                "seats": 5,
+                "variants": [
+                    {"name": "Omoda 5 1.5T RZ CVT", "start": 2023, "end": 2026, "msrp": 409800000, "trans": "CVT", "fuel": "Bensin", "cc": 1498, "aliases": "chery omoda 5,omoda 5 rz"},
+                    {"name": "Omoda E5 Pure / Luxury (BEV)", "start": 2024, "end": 2026, "msrp": 498800000, "trans": "Automatic", "fuel": "Listrik", "cc": 0, "aliases": "omoda e5,chery omoda ev"},
+                    {"name": "Tiggo 8 Pro 2.0T Premium", "start": 2022, "end": 2026, "msrp": 558500000, "trans": "Automatic", "fuel": "Bensin", "cc": 1998, "aliases": "chery tiggo 8 pro,tiggo 8"}
+                ]
+            }
+        ]
+    },
+    {
+        "brand": "Kia",
+        "country": "Korea Selatan",
+        "models": [
+            {
+                "name": "Sonet & Seltos",
+                "category": "SUV",
+                "cc": 1497,
+                "fuel": "Bensin",
+                "seats": 5,
+                "variants": [
+                    {"name": "Sonet 1.5 Premiere IVT", "start": 2020, "end": 2026, "msrp": 346000000, "trans": "CVT", "fuel": "Bensin", "cc": 1497, "aliases": "kia sonet premiere,sonet ivt"},
+                    {"name": "Seltos 1.4 Turbo GT Line DCT", "start": 2020, "end": 2026, "msrp": 446500000, "trans": "Automatic", "fuel": "Bensin", "cc": 1353, "aliases": "kia seltos,seltos gt line"}
+                ]
+            }
+        ]
     }
 ]
 
@@ -386,7 +494,7 @@ def seed_master_car_database():
     db = SessionLocal()
     try:
         brand_count = db.query(MasterBrand).count()
-        if brand_count >= 8:
+        if brand_count >= 15:
             print(f"ℹ️ Master car catalog sudah terisi ({brand_count} Brands). Melanjutkan...")
             return
 

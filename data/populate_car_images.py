@@ -91,6 +91,29 @@ IMAGE_CAR_MODEL_MAP = {
     "e-class": "https://cdn.imagin.studio/getimage?customer=demo&make=mercedes-benz&modelFamily=e-class&angle=01",
     "glc": "https://cdn.imagin.studio/getimage?customer=demo&make=mercedes-benz&modelFamily=glc-class&angle=01",
     "gla": "https://cdn.imagin.studio/getimage?customer=demo&make=mercedes-benz&modelFamily=gla-class&angle=01",
+
+    # Nissan
+    "livina": "https://cdn.imagin.studio/getimage?customer=demo&make=nissan&modelFamily=livina&angle=01",
+    "serena": "https://cdn.imagin.studio/getimage?customer=demo&make=nissan&modelFamily=serena&angle=01",
+    "kicks": "https://cdn.imagin.studio/getimage?customer=demo&make=nissan&modelFamily=kicks&angle=01",
+
+    # Mazda
+    "cx-5": "https://cdn.imagin.studio/getimage?customer=demo&make=mazda&modelFamily=cx-5&angle=01",
+    "cx-3": "https://cdn.imagin.studio/getimage?customer=demo&make=mazda&modelFamily=cx-3&angle=01",
+    "mazda2": "https://cdn.imagin.studio/getimage?customer=demo&make=mazda&modelFamily=mazda2&angle=01",
+    "mazda3": "https://cdn.imagin.studio/getimage?customer=demo&make=mazda&modelFamily=mazda3&angle=01",
+
+    # Isuzu
+    "panther": "https://cdn.imagin.studio/getimage?customer=demo&make=isuzu&modelFamily=mu-x&angle=01",
+    "mu-x": "https://cdn.imagin.studio/getimage?customer=demo&make=isuzu&modelFamily=mu-x&angle=01",
+
+    # Chery
+    "omoda": "https://cdn.imagin.studio/getimage?customer=demo&make=chery&modelFamily=omoda-5&angle=01",
+    "tiggo": "https://cdn.imagin.studio/getimage?customer=demo&make=chery&modelFamily=tiggo-8&angle=01",
+
+    # Kia
+    "sonet": "https://cdn.imagin.studio/getimage?customer=demo&make=kia&modelFamily=sonet&angle=01",
+    "seltos": "https://cdn.imagin.studio/getimage?customer=demo&make=kia&modelFamily=seltos&angle=01",
 }
 
 DEFAULT_CAR_FALLBACK = "https://cdn.imagin.studio/getimage?customer=demo&make=toyota&modelFamily=avanza&angle=01"

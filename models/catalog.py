@@ -243,3 +243,22 @@ class IbidMapValuation(Base):
 
     matched_variant = relationship("MasterVariant")
 
+
+class SyncJobLog(Base):
+    """
+    Audit Trail & Log Eksekusi Background Task / Scheduler Berkala
+    (IBID Astra MAP Harvester, Daily Market Quantile Refresh, & Wholesale Aggregator).
+    """
+    __tablename__ = "sync_job_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_name = Column(String(100), nullable=False, index=True)
+    trigger_source = Column(String(50), default="SCHEDULED_DAEMON") # 'SCHEDULED_DAEMON', 'STREAMLIT_UI', 'CLI', 'REST_API'
+    status = Column(String(30), default="SUCCESS", index=True) # 'RUNNING', 'SUCCESS', 'FAILED'
+    records_processed = Column(Integer, default=0)
+    duration_seconds = Column(Numeric(10, 2), default=0.0)
+    notes = Column(Text, nullable=True)
+    started_at = Column(DateTime, default=datetime.utcnow, index=True)
+    finished_at = Column(DateTime, nullable=True)
+
+
