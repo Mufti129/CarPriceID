@@ -1,6 +1,8 @@
 import time
 import random
+import urllib.parse
 import requests
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 USER_AGENTS = [
@@ -177,10 +179,13 @@ class OLXCarScraper:
         results = []
         for idx, item in enumerate(feed_templates):
             ext_id = f"OLX-FEED-{1000 + page * 20 + idx}"
+            clean_q = " ".join(item["title"].split()[:3])
+            yr_val = item["year"]
+            live_url = f"https://www.olx.co.id/mobil-bekas_c198?q={urllib.parse.quote(f'{clean_q} {yr_val}')}"
             results.append({
                 "source_platform": "olx",
                 "external_id": ext_id,
-                "url": f"https://www.olx.co.id/item/{ext_id}",
+                "url": live_url,
                 "title": item["title"],
                 "raw_description": item["desc"],
                 "price": item["price"],
@@ -190,6 +195,6 @@ class OLXCarScraper:
                 "fuel_type": item["fuel"],
                 "city": item["city"],
                 "province": item["prov"],
-                "posted_at": datetime.utcnow()
+                "posted_at": datetime.now()
             })
         return results

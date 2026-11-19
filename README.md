@@ -10,9 +10,9 @@
 2. **Fair Market Value (FMV) Calculator:** Mesin valuasi berbasis Machine Learning Hedonic Regression Versi 7 ($R^2 = 0.9542$, $\text{MAPE} = 3.94\%$) dilengkapi kurva proyeksi nilai sisa 10 tahun dan ekspor **Sertifikat Valuasi PDF Resmi**.
 3. **3-Tier Price Corridors & Monitoring:** Visualisasi 3 tingkatan harga (Tier 1 Floor Lelang -> Tier 2 Hammer Lelang -> Tier 3 FMV Retail) serta analisis gross margin & net profit showroom dealer.
 4. **Bargain & Arbitrage Scanner:** Algoritma pemindai listing retail murah dengan potensi selisih keuntungan perputaran unit cepat.
-5. **Wholesale & Auction Intelligence:** Integrasi data balai lelang resmi (JBA Indonesia & IBID Astra) lengkap dengan inspeksi teknis 4-titik (Eksterior, Interior, Mesin, Sasis).
+5. **Wholesale & Auction Intelligence (JBA & IBID Astra MAP):** Integrasi langsung ke dual-host REST API resmi **IBID Astra MAP (`map.ibid.astra.co.id`)** mencakup 26 merek mobil, valuasi multi-tahun, dan rincian harga per unit berdasarkan inspeksi teknis 4-titik ACV (Grade A, B, C, D) yang disinkronkan berkala ke database lokal `mobil_bekas.db` (`ibid_map_valuations`).
 6. **AI NLP & Scam Filter:** Pembersih harga DP/uang muka palsu dan pemetaan varian fuzzy (*Entity Resolution*).
-7. **FastAPI REST Endpoints:** Siap diintegrasikan ke mobile app atau sistem CRM dealer.
+7. **Enterprise B2B FastAPI REST Endpoints (13 Endpoints):** Siap diintegrasikan ke mobile app, sistem multifinance, atau CRM dealer.
 
 ---
 
@@ -23,19 +23,21 @@
 pip install -r requirements.txt
 ```
 
-### 2. Inisialisasi Database & Seeding
+### 2. Inisialisasi Database & Sinkronisasi IBID Astra MAP
 ```bash
 python main.py --seed
+python -m data.sync_ibid_map_data --brands 26 --delay 0.05
 ```
 
-### 3. Menjalankan Dashboard Streamlit
+### 3. Menjalankan Dashboard Streamlit & REST API
 ```bash
 streamlit run app.py
+uvicorn api.main:app --reload --port 8000
 ```
 
-### 4. Menjalankan Unit Tests
+### 4. Menjalankan Seluruh Unit Tests (21 Test Cases)
 ```bash
-python -m unittest tests/test_car_pipeline.py
+PYTHONPATH=. python -m unittest discover tests
 ```
 
 ---

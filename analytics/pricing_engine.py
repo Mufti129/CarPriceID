@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models.catalog import (
     ScrapedListing, MasterVariant, MasterModel, MasterBrand, MarketPriceStats,
-    AuctionLot, WholesalePriceStats
+    AuctionLot, WholesalePriceStats, IbidMapValuation
 )
 
 def percentile(data, p):
@@ -264,6 +264,26 @@ class PricingAnalyticsEngine:
         net_profit = gross_spread - recondition_cost
         net_margin_pct = (net_profit / modal_unit * 100.0) if modal_unit > 0 else 0.0
 
+        ibid_rec = self.db.query(IbidMapValuation).filter(
+            IbidMapValuation.matched_variant_id == variant_id,
+            IbidMapValuation.year == year
+        ).first()
+        ibid_benchmark = None
+        if ibid_rec:
+            ibid_benchmark = {
+                "brand": ibid_rec.brand,
+                "series": ibid_rec.series,
+                "type": ibid_rec.type,
+                "year": ibid_rec.year,
+                "transmission": ibid_rec.transmission,
+                "min_price": float(ibid_rec.min_price) if ibid_rec.min_price else None,
+                "max_price": float(ibid_rec.max_price) if ibid_rec.max_price else None,
+                "grade_a_price": float(ibid_rec.grade_a_price) if ibid_rec.grade_a_price else None,
+                "grade_b_price": float(ibid_rec.grade_b_price) if ibid_rec.grade_b_price else None,
+                "grade_c_price": float(ibid_rec.grade_c_price) if ibid_rec.grade_c_price else None,
+                "grade_d_price": float(ibid_rec.grade_d_price) if ibid_rec.grade_d_price else None,
+            }
+
         return {
             "variant_id": variant_id,
             "year": year,
@@ -292,7 +312,8 @@ class PricingAnalyticsEngine:
             "net_margin_pct": round(net_margin_pct, 1),
             "auction_lot_count": wholesale_stats.get("total_lots", wholesale_stats.get("sample_count", 15)) if wholesale_stats else 15,
             "retail_sample_count": retail_stats.get("sample_count", 24) if retail_stats else 24,
-            "auction_clearance_rate": round(wholesale_stats.get("clearance_rate_pct", 82.5), 1) if wholesale_stats else 82.5
+            "auction_clearance_rate": round(wholesale_stats.get("clearance_rate_pct", 82.5), 1) if wholesale_stats else 82.5,
+            "ibid_map_benchmark": ibid_benchmark
         }
 
     def calculate_dual_tier_corridor(self, variant_id: int, year: int, city: Optional[str] = None) -> Dict[str, Any]:

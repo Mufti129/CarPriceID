@@ -5,7 +5,9 @@ CLI & Pipeline Orchestrator untuk CarPrice ID.
 import sys
 import argparse
 from models.database import SessionLocal, init_db
-from models.catalog import MasterBrand, MasterModel, MasterVariant, ScrapedListing, AuctionLot
+from models.catalog import (
+    MasterBrand, MasterModel, MasterVariant, ScrapedListing, AuctionLot, IbidMapValuation
+)
 from scrapers.expand_car_dataset import run_full_car_ingestion_pipeline
 from analytics.pricing_engine import PricingAnalyticsEngine
 from analytics.ml_car_valuation import ml_car_model_v7
@@ -29,6 +31,7 @@ def show_summary():
         cash_listings = db.query(ScrapedListing).filter(ScrapedListing.is_dp_price == False).count()
         dp_scams = db.query(ScrapedListing).filter(ScrapedListing.is_dp_price == True).count()
         lots = db.query(AuctionLot).count()
+        ibid_map = db.query(IbidMapValuation).count()
 
         print(f"📊 DATABASE SUMMARY STATS:")
         print(f"  • Master Brands       : {brands}")
@@ -38,6 +41,7 @@ def show_summary():
         print(f"  • Verified Cash Price : {cash_listings:,}")
         print(f"  • DP / Clickbait Ads  : {dp_scams:,}")
         print(f"  • Auction Lots (JBA)  : {lots:,}")
+        print(f"  • IBID Astra MAP Data : {ibid_map:,}")
         print(f"\n🧠 ML VALUATION MODEL:")
         print(f"  • Model Version       : {ml_car_model_v7.version}")
         print(f"  • R2 Determination    : {ml_car_model_v7.evaluation_metrics['r2_score']}")

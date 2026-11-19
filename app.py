@@ -1633,8 +1633,10 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
         if not records:
             st.info("Belum ada data valuasi IBID MAP di database lokal. Silakan jalankan Auto-Sync di menu 'Live Scraper & Crawler Center'.")
         else:
+            import urllib.parse
             map_data = []
             for r in records:
+                q_ibid = urllib.parse.quote_plus(f"{r.brand} {r.series}")
                 map_data.append({
                     "Merek": r.brand,
                     "Seri": r.series,
@@ -1650,7 +1652,7 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                     "Grade D (Rp)": float(r.grade_d_price) if r.grade_d_price else None,
                     "Lokasi Acuan": r.location or "JAKARTA",
                     "Terakhir Disinkron": r.last_synced_at.strftime("%Y-%m-%d %H:%M") if r.last_synced_at else "-",
-                    "Portal Resmi": "https://map.ibid.astra.co.id/"
+                    "URL": f"https://www.ibid.astra.co.id/cari-otomotif?keyword={q_ibid}&kategori=mobil"
                 })
             df_map = pd.DataFrame(map_data)
 
@@ -1719,6 +1721,48 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                 </div>
                 """, unsafe_allow_html=True)
 
+            # Visual ACV Grade Ladder Inspector
+            if not filtered_map.empty:
+                st.markdown("<br>", unsafe_allow_html=True)
+                unit_labels = [
+                    f"{row['Merek']} {row['Seri']} {row['Tipe']} ({row['Silinder']}L) - {row['Tahun']} {row['Transmisi']}"
+                    for _, row in filtered_map.head(80).iterrows()
+                ]
+                sel_unit_idx = st.selectbox(
+                    "Inspeksi Visual Tangga Harga per Grade ACV (Pilih Unit Spesifik):",
+                    range(len(unit_labels)),
+                    format_func=lambda i: unit_labels[i],
+                    key="ibid_map_unit_inspect"
+                )
+                sel_row = filtered_map.iloc[sel_unit_idx]
+                g_bars = []
+                for g_label, g_col, g_color in [
+                    ("Min Limit Lelang", "Min Limit (Rp)", "#64748b"),
+                    ("ACV Grade D (Rekondisi)", "Grade D (Rp)", "#ef4444"),
+                    ("ACV Grade C (Cukup)", "Grade C (Rp)", "#f59e0b"),
+                    ("ACV Grade B (Standar Baik)", "Grade B (Rp)", "#3b82f6"),
+                    ("ACV Grade A (Istimewa)", "Grade A (Rp)", "#10b981"),
+                    ("Max Limit Lelang", "Max Limit (Rp)", "#8b5cf6"),
+                ]:
+                    val = sel_row.get(g_col)
+                    if pd.notna(val) and val and float(val) > 0:
+                        g_bars.append({"Kategori Grade": g_label, "Harga Valuasi (Rp)": float(val), "Color": g_color})
+
+                if g_bars:
+                    df_gbars = pd.DataFrame(g_bars)
+                    fig_g = px.bar(
+                        df_gbars,
+                        x="Kategori Grade",
+                        y="Harga Valuasi (Rp)",
+                        color="Kategori Grade",
+                        color_discrete_sequence=df_gbars["Color"].tolist(),
+                        text="Harga Valuasi (Rp)"
+                    )
+                    fig_g.update_traces(texttemplate="Rp %{text:,.0f}", textposition="outside")
+                    fig_g = format_dark_chart(fig_g, show_legend=False, y_title="Valuasi Lelang (IDR)", is_price_axis=True)
+                    fig_g.update_layout(height=340, title=f"Tangga Valuasi Grade ACV: {unit_labels[sel_unit_idx]}")
+                    st.plotly_chart(fig_g, use_container_width=True)
+
             # Export & Table
             st.markdown("<br>", unsafe_allow_html=True)
             col_d1, col_d2 = st.columns([3, 1])
@@ -1743,7 +1787,7 @@ elif menu == "Wholesale & Auction Intelligence (JBA & IBID)":
                     "Grade B (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Grade C (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
                     "Grade D (Rp)": st.column_config.NumberColumn(format="Rp %,.0f"),
-                    "Portal Resmi": st.column_config.LinkColumn("Portal MAP", display_text="Buka MAP ↗")
+                    "URL": st.column_config.LinkColumn("Listing URL", display_text="Link Post")
                 },
                 hide_index=True,
                 use_container_width=True

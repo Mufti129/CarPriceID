@@ -88,13 +88,39 @@ class TestCarPriceAPI(unittest.TestCase):
         data = res.json()
         self.assertEqual(data["status"], "OPERATIONAL")
         self.assertIn("total_records", data)
+        self.assertGreaterEqual(data["total_records"], 400)
         self.assertIn("synced_brands", data)
 
     def test_ibid_map_valuations(self):
-        res = self.client.get("/api/v1/wholesale/ibid-map/valuations?limit=10")
+        res = self.client.get("/api/v1/wholesale/ibid-map/valuations?brand=TOYOTA&limit=10")
         self.assertEqual(res.status_code, 200)
         items = res.json()
         self.assertIsInstance(items, list)
+        self.assertGreater(len(items), 0)
+        for item in items:
+            if item.get("grade_a_price"):
+                self.assertNotEqual(item["grade_a_price"], 592500000.0)
+
+    def test_extract_unit_grade_prices_ignores_total_harga(self):
+        from scrapers.ibid_map_scraper import _extract_unit_grade_prices
+        sample_api_item = {
+            "totalHarga": 869520000,
+            "hargaTertinggi": "148500000",
+            "hargaTerendah": "142700000",
+            "grade": "A"
+        }
+        parsed = _extract_unit_grade_prices(sample_api_item)
+        self.assertEqual(parsed["low"], 142700000.0)
+        self.assertEqual(parsed["high"], 148500000.0)
+        self.assertEqual(parsed["mid"], 145600000.0)
+
+    def test_olx_scraper_feed_valid_urls(self):
+        from scrapers.olx_car_scraper import OLXCarScraper
+        scraper = OLXCarScraper()
+        feed = scraper._generate_realistic_feed("Innova", "indonesia", 0)
+        self.assertGreater(len(feed), 0)
+        for item in feed:
+            self.assertIn("https://www.olx.co.id/mobil-bekas_c198?q=", item["url"])
 
 if __name__ == "__main__":
     unittest.main()

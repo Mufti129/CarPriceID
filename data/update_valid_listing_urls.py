@@ -120,6 +120,26 @@ def update_all_urls():
         db.commit()
         print(f'Berhasil memperbarui {updated_auction_count} URL AuctionLot.')
 
+        # Sinkronkan juga dataset_mentah.csv jika file tersedia
+        csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dataset_mentah.csv')
+        if os.path.exists(csv_path):
+            import pandas as pd
+            print('Memperbarui URL pada dataset_mentah.csv...')
+            df_csv = pd.read_csv(csv_path)
+            if {'platform', 'brand', 'model', 'year', 'variant'}.issubset(df_csv.columns):
+                df_csv['url'] = [
+                    build_retail_listing_url(p, b, m, y, v)
+                    for p, b, m, y, v in zip(
+                        df_csv['platform'],
+                        df_csv['brand'],
+                        df_csv['model'],
+                        df_csv['year'],
+                        df_csv['variant'],
+                    )
+                ]
+                df_csv.to_csv(csv_path, index=False)
+                print(f'Berhasil memperbarui {len(df_csv)} URL pada dataset_mentah.csv.')
+
     finally:
         db.close()
 
